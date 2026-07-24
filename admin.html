@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - Catatan Kelas Bahasa Korea</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f5f6fa;
+    margin: 0;
+    padding: 20px;
+    color: #222;
+  }
+  .card {
+    max-width: 460px;
+    margin: 30px auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 24px;
+  }
+  h2 { margin-top: 0; font-size: 19px; }
+  label { font-size: 13px; font-weight: 600; display: block; margin: 14px 0 6px; }
+  input[type="email"], input[type="password"], input[type="url"], input[type="file"], textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px;
+    background: #2b3a67;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .msg { font-size: 13px; margin-top: 10px; }
+  .msg.error { color: #c0392b; }
+  .msg.success { color: #27ae60; }
+  #logoutBtn {
+    background: #999;
+    margin-top: 8px;
+  }
+  .preview {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .preview img {
+    width: 70px;
+    height: 70px;
+    object-fit: cover;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div class="card" id="loginCard">
+  <h2>🔐 Login Guru</h2>
+  <label>Email</label>
+  <input type="email" id="email" placeholder="email@contoh.com">
+  <label>Password</label>
+  <input type="password" id="password">
+  <button id="loginBtn">Masuk</button>
+  <div class="msg error" id="loginMsg"></div>
+</div>
+
+<div class="card" id="formCard" style="display:none;">
+  <h2>📤 Tambah Materi Baru</h2>
+
+  <label>Foto materi/catatan (bisa lebih dari satu)</label>
+  <input type="file" id="photos" accept="image/*" multiple>
+  <div class="preview" id="preview"></div>
+
+  <label>Link tugas / kuis (opsional)</label>
+  <input type="url" id="taskLink" placeholder="https://forms.google.com/...">
+
+  <label>Catatan singkat (opsional)</label>
+  <textarea id="caption" placeholder="Contoh: Materi hari ini tentang 안녕하세요..."></textarea>
+
+  <button id="submitBtn">Bagikan ke Murid</button>
+  <div class="msg" id="formMsg"></div>
+
+  <button id="logoutBtn">Keluar</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// GANTI dengan config Firebase Anda sendiri (sama seperti di index.html)
+const firebaseConfig = {
+  apiKey: "GANTI_INI",
+  authDomain: "GANTI_INI.firebaseapp.com",
+  projectId: "GANTI_INI",
+  storageBucket: "GANTI_INI.firebasestorage.app",
+  messagingSenderId: "GANTI_INI",
+  appId: "GANTI_INI"
+};
+
+// API key gratis dari https://api.imgbb.com/ - dipakai untuk upload foto
+const IMGBB_API_KEY = "4d9de9a82287ca38c3be81b9d278a234";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+async function uploadToImgbb(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+    method: "POST",
+    body: formData
+  });
+  const data = await res.json();
+  if (!data.success) {
+    throw new Error(data.error?.message || "Upload ke ImgBB gagal");
+  }
+  return data.data.url;
+}
+
+const loginCard = document.getElementById("loginCard");
+const formCard = document.getElementById("formCard");
+const loginMsg = document.getElementById("loginMsg");
+const formMsg = document.getElementById("formMsg");
+let selectedFiles = [];
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    loginCard.style.display = "none";
+    formCard.style.display = "block";
+  } else {
+    loginCard.style.display = "block";
+    formCard.style.display = "none";
+  }
+});
+
+document.getElementById("loginBtn").onclick = async () => {
+  loginMsg.textContent = "";
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (err) {
+    loginMsg.textContent = "Login gagal: email/password salah.";
+  }
+};
+
+document.getElementById("logoutBtn").onclick = () => signOut(auth);
+
+document.getElementById("photos").addEventListener("change", (e) => {
+  selectedFiles = Array.from(e.target.files);
+  const preview = document.getElementById("preview");
+  preview.innerHTML = "";
+  selectedFiles.forEach(file => {
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    preview.appendChild(img);
+  });
+});
+
+document.getElementById("submitBtn").onclick = async () => {
+  const btn = document.getElementById("submitBtn");
+  formMsg.className = "msg";
+  formMsg.textContent = "";
+
+  const taskLink = document.getElementById("taskLink").value.trim();
+  const caption = document.getElementById("caption").value.trim();
+
+  if (selectedFiles.length === 0 && !taskLink && !caption) {
+    formMsg.className = "msg error";
+    formMsg.textContent = "Isi minimal satu: foto, link, atau catatan.";
+    return;
+  }
+
+  btn.disabled = true;
+  formMsg.textContent = "Mengunggah...";
+
+  try {
+    const photoUrls = [];
+    let i = 0;
+    for (const file of selectedFiles) {
+      i++;
+      formMsg.textContent = `Mengunggah foto ${i} dari ${selectedFiles.length}...`;
+      const url = await uploadToImgbb(file);
+      photoUrls.push(url);
+    }
+
+    formMsg.textContent = "Menyimpan data...";
+    await addDoc(collection(db, "posts"), {
+      photoUrls,
+      taskLink: taskLink || null,
+      caption: caption || null,
+      createdAt: serverTimestamp()
+    });
+
+    formMsg.className = "msg success";
+    formMsg.textContent = "Berhasil dibagikan ke murid!";
+    document.getElementById("photos").value = "";
+    document.getElementById("preview").innerHTML = "";
+    document.getElementById("taskLink").value = "";
+    document.getElementById("caption").value = "";
+    selectedFiles = [];
+  } catch (err) {
+    formMsg.className = "msg error";
+    formMsg.textContent = "Gagal: " + err.message;
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+};
+</script>
+
+</body>
+</html>
