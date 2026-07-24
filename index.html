@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catatan Kelas Bahasa Korea</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f5f6fa;
+    margin: 0;
+    padding: 0 0 40px 0;
+    color: #222;
+  }
+  header {
+    background: #2b3a67;
+    color: white;
+    padding: 20px;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 5px 0 0; font-size: 13px; opacity: 0.85; }
+
+  .container {
+    max-width: 640px;
+    margin: 20px auto;
+    padding: 0 15px;
+  }
+
+  .post {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .post-date {
+    font-size: 12px;
+    color: #888;
+    padding: 12px 15px 0 15px;
+  }
+  .post-caption {
+    padding: 8px 15px 0 15px;
+    font-size: 15px;
+    white-space: pre-wrap;
+  }
+  .post-photos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 4px;
+    padding: 10px 15px;
+  }
+  .post-photos img {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+    cursor: pointer;
+  }
+  .post-link {
+    display: block;
+    margin: 0 15px 15px 15px;
+    background: #2b3a67;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .empty {
+    text-align: center;
+    color: #999;
+    margin-top: 60px;
+  }
+
+  /* lightbox sederhana */
+  .lightbox {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    padding: 20px;
+  }
+  .lightbox img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📚 Catatan Kelas Bahasa Korea</h1>
+  <p>Materi &amp; tugas terbaru</p>
+</header>
+
+<div class="container" id="posts">
+  <p class="empty">Memuat materi...</p>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="this.style.display='none'">
+  <img id="lightbox-img" src="">
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// GANTI dengan config Firebase Anda sendiri
+const firebaseConfig = {
+  apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
+  authDomain: "notepad-d9f0b.firebaseapp.com",
+  projectId: "notepad-d9f0b",
+  storageBucket: "notepad-d9f0b.firebasestorage.app",
+  messagingSenderId: "1081281593555",
+  appId: "1:1081281593555:web:ab931db0e2282f8e325426"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const postsEl = document.getElementById("posts");
+const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+
+onSnapshot(q, (snapshot) => {
+  if (snapshot.empty) {
+    postsEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
+    return;
+  }
+
+  postsEl.innerHTML = "";
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const date = data.createdAt?.toDate
+      ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      : "";
+
+    const photos = (data.photoUrls || [])
+      .map(url => `<img src="${url}" onclick="openLightbox('${url}')">`)
+      .join("");
+
+    const linkBtn = data.taskLink
+      ? `<a class="post-link" href="${data.taskLink}" target="_blank" rel="noopener noreferrer">📝 Buka Tugas / Kuis</a>`
+      : "";
+
+    const caption = data.caption
+      ? `<div class="post-caption">${escapeHtml(data.caption)}</div>`
+      : "";
+
+    const post = document.createElement("div");
+    post.className = "post";
+    post.innerHTML = `
+      <div class="post-date">${date}</div>
+      ${caption}
+      <div class="post-photos">${photos}</div>
+      ${linkBtn}
+    `;
+    postsEl.appendChild(post);
+  });
+});
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+window.openLightbox = function(url) {
+  document.getElementById("lightbox-img").src = url;
+  document.getElementById("lightbox").style.display = "flex";
+};
+</script>
+
+</body>
+</html>
