@@ -369,7 +369,7 @@ function startEdit(id, data) {
   cancelEditBtn.style.display = "block";
 
   linksContainer.innerHTML = "";
-  const existingLinks = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
+  const existingLinks = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   if (existingLinks.length === 0) {
     addLinkRow();
   } else {
