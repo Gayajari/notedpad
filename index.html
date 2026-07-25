@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catatan Kelas Bahasa Korea</title>
+<title>Serba Nikmat</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -95,12 +95,12 @@
 <body>
 
 <header>
-  <h1>📚 Catatan Kelas Bahasa Korea</h1>
-  <p>Materi &amp; tugas terbaru</p>
+  <h1>cek dulu</h1>
+  <p>Update terbaru</p>
 </header>
 
 <div class="container" id="posts">
-  <p class="empty">Memuat materi...</p>
+  <p class="empty">Memuat konten...</p>
 </div>
 
 <div class="lightbox" id="lightbox" onclick="this.style.display='none'">
@@ -129,7 +129,7 @@ const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
 
 onSnapshot(q, (snapshot) => {
   if (snapshot.empty) {
-    postsEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
+    postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>';
     return;
   }
 
@@ -145,7 +145,7 @@ onSnapshot(q, (snapshot) => {
       .join("");
 
     const linkBtn = data.taskLink
-      ? `<a class="post-link" href="${data.taskLink}" target="_blank" rel="noopener noreferrer">📝 Buka Tugas / Kuis</a>`
+      ? `<a class="post-link" href="${data.taskLink}" target="_blank" rel="noopener noreferrer">▶️ link </a>`
       : "";
 
     const caption = data.caption
