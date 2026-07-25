@@ -74,6 +74,37 @@
   .post-item .editBtn { background: #2b3a67; }
   .post-item .deleteBtn { background: #c0392b; }
   .empty { text-align: center; color: #999; font-size: 13px; padding: 10px 0; }
+
+  .link-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .link-row input[type="text"] {
+    flex: 0 0 35%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .link-row input[type="url"] {
+    flex: 1;
+  }
+  .link-row button {
+    width: auto;
+    margin: 0;
+    padding: 0 12px;
+    background: #c0392b;
+    border-radius: 8px;
+  }
+  #addLinkBtn {
+    background: white;
+    color: #2b3a67;
+    border: 1.5px dashed #2b3a67;
+    margin-top: 8px;
+    padding: 8px;
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -96,8 +127,9 @@
   <div class="preview" id="preview"></div>
   <div class="preview" id="existingPreview"></div>
 
-  <label>Link tugas / kuis (opsional)</label>
-  <input type="url" id="taskLink" placeholder="https://forms.google.com/...">
+  <label>Link (tugas, kuis, video, dll — bisa lebih dari satu)</label>
+  <div id="linksContainer"></div>
+  <button type="button" id="addLinkBtn">+ Tambah Link</button>
 
   <label>Catatan singkat (opsional)</label>
   <textarea id="caption" placeholder="Contoh: Materi hari ini tentang 안녕하세요..."></textarea>
@@ -129,7 +161,7 @@ const firebaseConfig = {
   messagingSenderId: "1081281593555",
   appId: "1:1081281593555:web:ab931db0e2282f8e325426"
 };
- 
+
 // API key gratis dari https://api.imgbb.com/ - dipakai untuk upload foto
 const IMGBB_API_KEY = "4d9de9a82287ca38c3be81b9d278a234";
 
@@ -202,6 +234,41 @@ document.getElementById("photos").addEventListener("change", (e) => {
   });
 });
 
+const linksContainer = document.getElementById("linksContainer");
+
+function addLinkRow(label = "", url = "") {
+  const row = document.createElement("div");
+  row.className = "link-row";
+  row.innerHTML = `
+    <input type="text" placeholder="Nama (mis. Kuis)" value="${escapeAttr(label)}">
+    <input type="url" placeholder="https://..." value="${escapeAttr(url)}">
+    <button type="button">✕</button>
+  `;
+  row.querySelector("button").onclick = () => row.remove();
+  linksContainer.appendChild(row);
+}
+
+function getLinksFromForm() {
+  const rows = linksContainer.querySelectorAll(".link-row");
+  const links = [];
+  rows.forEach((row) => {
+    const inputs = row.querySelectorAll("input");
+    const label = inputs[0].value.trim();
+    const url = inputs[1].value.trim();
+    if (url) {
+      links.push({ label: label || "Buka Link", url });
+    }
+  });
+  return links;
+}
+
+function escapeAttr(str) {
+  return String(str).replace(/"/g, "&quot;");
+}
+
+document.getElementById("addLinkBtn").onclick = () => addLinkRow();
+addLinkRow(); // baris kosong pertama saat halaman dibuka
+
 function resetForm() {
   editingId = null;
   editingExistingPhotos = [];
@@ -211,7 +278,8 @@ function resetForm() {
   document.getElementById("photos").value = "";
   document.getElementById("preview").innerHTML = "";
   existingPreview.innerHTML = "";
-  document.getElementById("taskLink").value = "";
+  linksContainer.innerHTML = "";
+  addLinkRow();
   document.getElementById("caption").value = "";
   document.getElementById("resultLink").style.display = "none";
   selectedFiles = [];
@@ -224,10 +292,10 @@ submitBtn.onclick = async () => {
   formMsg.className = "msg";
   formMsg.textContent = "";
 
-  const taskLink = document.getElementById("taskLink").value.trim();
+  const links = getLinksFromForm();
   const caption = document.getElementById("caption").value.trim();
 
-  if (selectedFiles.length === 0 && editingExistingPhotos.length === 0 && !taskLink && !caption) {
+  if (selectedFiles.length === 0 && editingExistingPhotos.length === 0 && links.length === 0 && !caption) {
     formMsg.className = "msg error";
     formMsg.textContent = "Isi minimal satu: foto, link, atau catatan.";
     return;
@@ -251,7 +319,7 @@ submitBtn.onclick = async () => {
     if (editingId) {
       await updateDoc(doc(db, "posts", editingId), {
         photoUrls,
-        taskLink: taskLink || null,
+        links,
         caption: caption || null
       });
       formMsg.className = "msg success";
@@ -260,7 +328,7 @@ submitBtn.onclick = async () => {
     } else {
       const docRef = await addDoc(collection(db, "posts"), {
         photoUrls,
-        taskLink: taskLink || null,
+        links,
         caption: caption || null,
         createdAt: serverTimestamp()
       });
@@ -287,7 +355,8 @@ function resetFieldsOnly() {
   document.getElementById("preview").innerHTML = "";
   selectedFiles = [];
   if (!editingId) {
-    document.getElementById("taskLink").value = "";
+    linksContainer.innerHTML = "";
+    addLinkRow();
     document.getElementById("caption").value = "";
   }
 }
@@ -298,7 +367,15 @@ function startEdit(id, data) {
   formTitle.textContent = "✏️ Edit Materi";
   submitBtn.textContent = "Simpan Perubahan";
   cancelEditBtn.style.display = "block";
-  document.getElementById("taskLink").value = data.taskLink || "";
+
+  linksContainer.innerHTML = "";
+  const existingLinks = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
+  if (existingLinks.length === 0) {
+    addLinkRow();
+  } else {
+    existingLinks.forEach(l => addLinkRow(l.label, l.url));
+  }
+
   document.getElementById("caption").value = data.caption || "";
   document.getElementById("resultLink").style.display = "none";
 
@@ -341,13 +418,18 @@ function listenPosts() {
         .map(url => `<img src="${url}">`)
         .join("");
 
+      const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
+      const linksHtml = linksList
+        .map(l => `<div class="link">🔗 ${escapeHtml(l.label)}: ${escapeHtml(l.url)}</div>`)
+        .join("");
+
       const item = document.createElement("div");
       item.className = "post-item";
       item.innerHTML = `
         <div class="date">${date}</div>
         ${data.caption ? `<div class="caption">${escapeHtml(data.caption)}</div>` : ""}
         <div class="thumbs">${thumbs}</div>
-        ${data.taskLink ? `<div class="link">🔗 ${escapeHtml(data.taskLink)}</div>` : ""}
+        ${linksHtml}
         <div class="actions">
           <button class="editBtn">Edit</button>
           <button class="deleteBtn">Hapus</button>
