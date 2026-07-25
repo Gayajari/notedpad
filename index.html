@@ -113,36 +113,33 @@
     max-width: 100%;
     max-height: 100%;
     border-radius: 8px;
-  } 
-.contact-bar{
-  display:flex;
-  justify-content:center;
-  gap:8px;
-  flex-wrap:wrap;
-  margin:0 15px 15px;
-}
-
-.contact-bar a{
-  text-decoration:none;
-  background:#2b3a67;
-  color:#fff;
-  padding:8px 12px;
-  border-radius:8px;
-  font-size:12px;
-  font-weight:600;
-}
-
-
-
-   
   }
+
+  .contact-bar{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    flex-wrap:wrap;
+    padding: 0 15px;
+  }
+
+  .contact-bar a{
+    text-decoration:none;
+    background:#2b3a67;
+    color:#fff;
+    padding:8px 12px;
+    border-radius:8px;
+    font-size:12px;
+    font-weight:600;
+  }
+
  .ads-banner{
   display:flex;
   justify-content:center;
   align-items:center;
   margin:12px auto;
  }
- 
+
 </style>
 </head>
 <body>
@@ -152,37 +149,22 @@
   <p>Konten update tiap hari</p>
 </header>
 
-
-<div class="ads-banner"> <script>
-
-};
-
+<div class="ads-banner">
+<script>
 atOptions = {
-
-'key': 'c815dc8b1442b1b2e98cf2ac0376024c',
-
-'format': 'iframe',
-
-'height': 50,
-
-'width': 320,
-
-'params': {}
-
+  'key': 'c815dc8b1442b1b2e98cf2ac0376024c',
+  'format': 'iframe',
+  'height': 50,
+  'width': 320,
+  'params': {}
+};
 </script>
-
-<script
-
-src="https://inputoppose.com/c815dc8b1442b1b2e98c f2ac0376024c/invoke.js"></script>
-
+<script src="https://inputoppose.com/c815dc8b1442b1b2e98cf2ac0376024c/invoke.js"></script>
 </div>
 
- 
+<div class="contact-bar" id="contactBar"></div>
 
-
- 
- 
-  <div class="container" id="posts">
+<div class="container" id="posts">
   <p class="empty">Memuat konten...</p>
 </div>
 
@@ -194,7 +176,6 @@ src="https://inputoppose.com/c815dc8b1442b1b2e98c f2ac0376024c/invoke.js"></scri
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// GANTI dengan config Firebase Anda sendiri
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -209,6 +190,30 @@ const db = getFirestore(app);
 
 const postsEl = document.getElementById("posts");
 const postId = new URLSearchParams(window.location.search).get("post");
+
+loadContactBar();
+
+async function loadContactBar() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "contact"));
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const bar = document.getElementById("contactBar");
+    let html = "";
+    if (data.telegram) {
+      html += `<a href="${data.telegram}" target="_blank" rel="noopener noreferrer">📢 Telegram</a>`;
+    }
+    if (data.facebook) {
+      html += `<a href="${data.facebook}" target="_blank" rel="noopener noreferrer">👥 Facebook</a>`;
+    }
+    if (data.whatsapp) {
+      html += `<a href="${data.whatsapp}" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>`;
+    }
+    bar.innerHTML = html;
+  } catch (err) {
+    console.error("Gagal memuat pengaturan kontak:", err);
+  }
+}
 
 function renderPost(docSnap) {
   const data = docSnap.data();
@@ -238,20 +243,12 @@ function renderPost(docSnap) {
     ${caption}
     <div class="post-photos">${photos}</div>
     ${linkBtns}
- <button class="post-share" onclick="sharePost('${shareUrl}', '${date}')">🔗 Bagikan Konten</button>
-
-<div class="contact-bar">
-  <a href="https://t.me/random_kulcok"_blank" rel="noopener noreferrer">📢 Telegram</a>
-  <a href="https://www.facebook.com/groups/350754974655513/?ref=share&mibextid=NSMWBT" target="_blank" rel="noopener noreferrer">👥 Facebook</a>
-  <a href="https://chat.whatsapp.com/F2F8kCD2h0YIncklXEM3lb" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>
-</div>  
-
- `;
+    <button class="post-share" onclick="sharePost('${shareUrl}', '${date}')">🔗 Bagikan Konten</button>
+  `;
   return post;
 }
- 
+
 if (postId) {
-  // Mode: tampilkan HANYA satu postingan sesuai link yang dibagikan
   getDoc(doc(db, "posts", postId)).then((docSnap) => {
     if (!docSnap.exists()) {
       postsEl.innerHTML = '<p class="empty">Materi tidak ditemukan.</p>';
@@ -263,7 +260,6 @@ if (postId) {
     postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>';
   });
 } else {
-  // Mode: tampilkan SEMUA postingan (feed lengkap), dikelompokkan per periode
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
@@ -345,6 +341,6 @@ window.sharePost = async function(url, dateLabel) {
   }
 };
 </script>
- <script src="https://inputoppose.com/84/0e/16/840e169d1e3f86906bb1490d05d95d42.js"></script>
+<script src="https://inputoppose.com/84/0e/16/840e169d1e3f86906bb1490d05d95d42.js"></script>
 </body>
 </html>
