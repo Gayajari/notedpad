@@ -174,8 +174,7 @@ atOptions = {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
+import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -256,10 +255,37 @@ if (postId) {
     }
     postsEl.innerHTML = "";
     postsEl.appendChild(renderPost(docSnap));
+
+    // Bar konten lainnya, live update, di bawah post yang dibagikan
+    const otherWrap = document.createElement("div");
+    otherWrap.id = "otherPosts";
+    postsEl.appendChild(otherWrap);
+
+    const qOthers = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(10));
+    onSnapshot(qOthers, (snapshot) => {
+      const others = snapshot.docs.filter(d => d.id !== postId);
+      if (others.length === 0) {
+        otherWrap.innerHTML = "";
+        return;
+      }
+      otherWrap.innerHTML = "";
+      const title = document.createElement("div");
+      title.className = "section-title";
+      title.textContent = "Konten Lainnya";
+      otherWrap.appendChild(title);
+      others.forEach((d) => otherWrap.appendChild(renderPost(d)));
+
+      const seeAll = document.createElement("a");
+      seeAll.className = "post-link";
+      seeAll.href = window.location.origin + "/";
+      seeAll.textContent = "📂 Lihat Semua Konten";
+      otherWrap.appendChild(seeAll);
+    });
   }).catch(() => {
     postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>';
   });
 } else {
+ 
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
