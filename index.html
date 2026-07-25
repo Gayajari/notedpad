@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Serba Nikmat🥵</title>
+<title>Serba Nikmat</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -120,7 +120,7 @@
 
 <header>
   <h1>Serba Nikmat🥵</h1>
-  <p>Konten & Update tiap hari</p>
+  <p>Konten update tiap hari</p>
 </header>
 
 <div class="container" id="posts">
@@ -144,7 +144,7 @@ const firebaseConfig = {
   messagingSenderId: "1081281593555",
   appId: "1:1081281593555:web:ab931db0e2282f8e325426"
 };
- 
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -161,9 +161,10 @@ function renderPost(docSnap) {
     .map(url => `<img src="${url}" onclick="openLightbox('${url}')">`)
     .join("");
 
-  const linkBtn = data.taskLink
-    ? `<a class="post-link" href="${data.taskLink}" target="_blank" rel="noopener noreferrer">▶️</a>`
-    : "";
+  const linksList = data.links || (data.taskLink ? [{ label: "Buka Tugas / Kuis", url: data.taskLink }] : []);
+  const linkBtns = linksList
+    .map(l => `<a class="post-link" href="${l.url}" target="_blank" rel="noopener noreferrer">📝 ${escapeHtml(l.label)}</a>`)
+    .join("");
 
   const caption = data.caption
     ? `<div class="post-caption">${escapeHtml(data.caption)}</div>`
@@ -177,8 +178,8 @@ function renderPost(docSnap) {
     <div class="post-date">${date}</div>
     ${caption}
     <div class="post-photos">${photos}</div>
-    ${linkBtn}
-    <button class="post-share" onclick="sharePost('${shareUrl}', '${date}')">🔗 Bagikan konten Ini</button>
+    ${linkBtns}
+    <button class="post-share" onclick="sharePost('${shareUrl}', '${date}')">🔗 Bagikan Konten </button>
   `;
   return post;
 }
@@ -200,7 +201,7 @@ if (postId) {
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
-      postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>';
+      postsEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
       return;
     }
 
@@ -255,8 +256,8 @@ window.openLightbox = function(url) {
 
 window.sharePost = async function(url, dateLabel) {
   const shareData = {
-    title: "Catatan Kelas Bahasa Korea",
-    text: `Materi kelas tanggal ${dateLabel}`,
+    title: "Catatan Konten",
+    text: `Konten data tanggal ${dateLabel}`,
     url: url
   };
 
