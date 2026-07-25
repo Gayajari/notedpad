@@ -105,6 +105,86 @@
     padding: 8px;
     font-size: 13px;
   }
+/* ===== Responsive Layout ===== */
+
+*{
+  box-sizing:border-box;
+}
+
+html{
+  scroll-behavior:smooth;
+}
+
+body{
+  margin:0;
+  width:100%;
+}
+
+.page-wrap{
+  width:100%;
+  max-width:700px;
+  margin:0 auto;
+  padding:16px;
+}
+
+img{
+  max-width:100%;
+  height:auto;
+  display:block;
+}
+
+iframe{
+  max-width:100%;
+}
+
+.ads-banner{
+  width:100%;
+  text-align:center;
+  margin:12px auto;
+  overflow:hidden;
+}
+
+.gallery{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+}
+
+.gallery img{
+  width:100%;
+  border-radius:8px;
+}
+
+/* Tablet */
+@media (min-width:768px){
+  .page-wrap{
+    max-width:900px;
+    padding:24px;
+  }
+
+  .gallery{
+    gap:12px;
+  }
+
+  h1{
+    font-size:32px;
+  }
+}
+
+/* Desktop */
+@media (min-width:1200px){
+  .page-wrap{
+    max-width:1100px;
+  }
+
+  .gallery{
+    gap:16px;
+  }
+
+  h1{
+    font-size:36px;
+  }
+} 
 </style>
 </head>
 <body>
