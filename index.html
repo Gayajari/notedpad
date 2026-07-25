@@ -161,7 +161,7 @@ function renderPost(docSnap) {
     .map(url => `<img src="${url}" onclick="openLightbox('${url}')">`)
     .join("");
 
-  const linksList = data.links || (data.taskLink ? [{ label: "Buka Tugas / Kuis", url: data.taskLink }] : []);
+  const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   const linkBtns = linksList
     .map(l => `<a class="post-link" href="${l.url}" target="_blank" rel="noopener noreferrer">📝 ${escapeHtml(l.label)}</a>`)
     .join("");
@@ -201,7 +201,7 @@ if (postId) {
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
     if (snapshot.empty) {
-      postsEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
+      postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>';
       return;
     }
 
