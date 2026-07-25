@@ -23,7 +23,7 @@
   }
   h2 { margin-top: 0; font-size: 19px; }
   label { font-size: 13px; font-weight: 600; display: block; margin: 14px 0 6px; }
-  input[type="email"], input[type="password"], input[type="url"], input[type="file"], textarea {
+  input[type="email"], input[type="password"], input[type="url"], input[type="text"], input[type="file"], textarea {
     width: 100%;
     padding: 10px;
     border: 1px solid #ddd;
@@ -107,16 +107,11 @@
   }
 /* ===== Responsive Layout ===== */
 
-*{
-  box-sizing:border-box;
-}
-
 html{
   scroll-behavior:smooth;
 }
 
 body{
-  margin:0;
   width:100%;
 }
 
@@ -184,7 +179,7 @@ iframe{
   h1{
     font-size:36px;
   }
-} 
+}
 </style>
 </head>
 <body>
@@ -197,6 +192,18 @@ iframe{
   <input type="password" id="password">
   <button id="loginBtn">Masuk</button>
   <div class="msg error" id="loginMsg"></div>
+</div>
+
+<div class="card" id="contactCard" style="display:none;">
+  <h2>🔗 Pengaturan Link Sosmed</h2>
+  <label>Link Telegram (kosongkan jika tidak dipakai)</label>
+  <input type="url" id="contactTelegram" placeholder="https://t.me/namagrup">
+  <label>Link Facebook (kosongkan jika tidak dipakai)</label>
+  <input type="url" id="contactFacebook" placeholder="https://www.facebook.com/groups/xxxx">
+  <label>Link WhatsApp (kosongkan jika tidak dipakai)</label>
+  <input type="url" id="contactWhatsapp" placeholder="https://chat.whatsapp.com/xxxx">
+  <button id="saveContactBtn">Simpan Pengaturan</button>
+  <div class="msg" id="contactMsg"></div>
 </div>
 
 <div class="card" id="formCard" style="display:none;">
@@ -230,9 +237,8 @@ iframe{
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// GANTI dengan config Firebase Anda sendiri (sama seperti di index.html)
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -266,6 +272,7 @@ async function uploadToImgbb(file) {
 const loginCard = document.getElementById("loginCard");
 const formCard = document.getElementById("formCard");
 const listCard = document.getElementById("listCard");
+const contactCard = document.getElementById("contactCard");
 const loginMsg = document.getElementById("loginMsg");
 const formMsg = document.getElementById("formMsg");
 const formTitle = document.getElementById("formTitle");
@@ -282,11 +289,14 @@ onAuthStateChanged(auth, (user) => {
     loginCard.style.display = "none";
     formCard.style.display = "block";
     listCard.style.display = "block";
+    contactCard.style.display = "block";
+    loadContactSettings();
     listenPosts();
   } else {
     loginCard.style.display = "block";
     formCard.style.display = "none";
     listCard.style.display = "none";
+    contactCard.style.display = "none";
   }
 });
 
@@ -521,6 +531,38 @@ function listenPosts() {
     });
   });
 }
+
+async function loadContactSettings() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "contact"));
+    if (snap.exists()) {
+      const data = snap.data();
+      document.getElementById("contactTelegram").value = data.telegram || "";
+      document.getElementById("contactFacebook").value = data.facebook || "";
+      document.getElementById("contactWhatsapp").value = data.whatsapp || "";
+    }
+  } catch (err) {
+    console.error("Gagal memuat pengaturan kontak:", err);
+  }
+}
+
+document.getElementById("saveContactBtn").onclick = async () => {
+  const msgEl = document.getElementById("contactMsg");
+  msgEl.className = "msg";
+  msgEl.textContent = "Menyimpan...";
+  try {
+    await setDoc(doc(db, "settings", "contact"), {
+      telegram: document.getElementById("contactTelegram").value.trim() || null,
+      facebook: document.getElementById("contactFacebook").value.trim() || null,
+      whatsapp: document.getElementById("contactWhatsapp").value.trim() || null
+    });
+    msgEl.className = "msg success";
+    msgEl.textContent = "Pengaturan link sosmed berhasil disimpan!";
+  } catch (err) {
+    msgEl.className = "msg error";
+    msgEl.textContent = "Gagal: " + err.message;
+  }
+};
 
 function escapeHtml(str) {
   const div = document.createElement("div");
