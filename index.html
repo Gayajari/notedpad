@@ -114,15 +114,6 @@
     max-height: 100%;
     border-radius: 8px;
   }
-.ads-banner{
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    margin:12px auto;
-    min-height:50px;
-    overflow:hidden;
-}
-   
 </style>
 </head>
 <body>
@@ -245,27 +236,9 @@ if (postId) {
       title.className = "section-title";
       title.textContent = label;
       postsEl.appendChild(title);
-groups[key].forEach((docSnap, index) => {
-  postsEl.appendChild(renderPost(docSnap));
-
-  if ((index + 1) % 3 === 0) {
-    const ads = document.createElement("div");
-    ads.className = "ads-banner";
-    ads.innerHTML = `
-      <script>
-        atOptions = {
-          'key':'c815dc8b1442b1b2e98cf2ac0376024c',
-          'format':'iframe',
-          'height':50,
-          'width':320,
-          'params':{}
-        };
-      <\/script>
-      <script src="https://inputoppose.com/c815dc8b1442b1b2e98cf2ac0376024c/invoke.js"><\/script>
-    `;
-    postsEl.appendChild(ads);
-      }
-     });
+      groups[key].forEach((docSnap) => {
+        postsEl.appendChild(renderPost(docSnap));
+      });
     });
   });
 }
@@ -306,6 +279,5 @@ window.sharePost = async function(url, dateLabel) {
   }
 };
 </script>
-<script src="https://inputoppose.com/84/0e/16/840e169d1e3f86906bb1490d05d95d42.js"></script>
 </body>
 </html>
