@@ -184,19 +184,6 @@ function renderPost(docSnap) {
   `;
   return post;
 }
-<div class="ads-banner">
-  <script>
-    atOptions = {
-      'key' : 'c815dc8b1442b1b2e98cf2ac0376024c',
-      'format' : 'iframe',
-      'height' : 50,
-      'width' : 320,
-      'params' : {}
-    };
-  </script>
-  <script src="https://inputoppose.com/c815dc8b1442b1b2e98cf2ac0376024c/invoke.js"></script>
-</div>
-
 if (postId) {
   // Mode: tampilkan HANYA satu postingan sesuai link yang dibagikan
   getDoc(doc(db, "posts", postId)).then((docSnap) => {
