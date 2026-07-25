@@ -83,6 +83,23 @@
     cursor: pointer;
   }
   .post-share:active { background: #eef1fb; }
+
+  .post-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 8px 15px 0 15px;
+  }
+  .tag-chip {
+    text-decoration: none;
+    background: #eef1fb;
+    color: #2b3a67;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .tag-chip:active { background: #dde3f7; }
   .empty {
     text-align: center;
     color: #999;
@@ -174,7 +191,7 @@ atOptions = {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, orderBy, limit, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -189,6 +206,7 @@ const db = getFirestore(app);
 
 const postsEl = document.getElementById("posts");
 const postId = new URLSearchParams(window.location.search).get("post");
+const tagParam = new URLSearchParams(window.location.search).get("tag");
 
 loadContactBar();
 
@@ -233,6 +251,11 @@ function renderPost(docSnap) {
     ? `<div class="post-caption">${escapeHtml(data.caption)}</div>`
     : "";
 
+  const tagsList = data.tags || [];
+  const tagsHtml = tagsList.length
+    ? `<div class="post-tags">${tagsList.map(t => `<a class="tag-chip" href="?tag=${encodeURIComponent(t)}">#${escapeHtml(t)}</a>`).join("")}</div>`
+    : "";
+
   const shareUrl = `${window.location.origin}/?post=${docSnap.id}`;
 
   const post = document.createElement("div");
@@ -240,6 +263,7 @@ function renderPost(docSnap) {
   post.innerHTML = `
     <div class="post-date">${date}</div>
     ${caption}
+    ${tagsHtml}
     <div class="post-photos">${photos}</div>
     ${linkBtns}
     <button class="post-share" onclick="sharePost('${shareUrl}', '${date}')">🔗 Bagikan Konten</button>
@@ -283,6 +307,30 @@ if (postId) {
     });
   }).catch(() => {
     postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>';
+  });
+} else if (tagParam) {
+  const qTag = query(collection(db, "posts"), where("tags", "array-contains", tagParam), orderBy("createdAt", "desc"));
+  onSnapshot(qTag, (snapshot) => {
+    postsEl.innerHTML = "";
+    const header = document.createElement("div");
+    header.className = "section-title";
+    header.textContent = `Tag: ${tagParam}`;
+    postsEl.appendChild(header);
+
+    if (snapshot.empty) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "Belum ada konten dengan tag ini.";
+      postsEl.appendChild(empty);
+    } else {
+      snapshot.forEach((d) => postsEl.appendChild(renderPost(d)));
+    }
+
+    const seeAll = document.createElement("a");
+    seeAll.className = "post-link";
+    seeAll.href = window.location.origin + "/";
+    seeAll.textContent = "📂 Lihat Semua Konten";
+    postsEl.appendChild(seeAll);
   });
 } else {
  
