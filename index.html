@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Serba Nikmat</title>
+<title>Serba Nikmat🥵</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -68,11 +68,35 @@
     text-decoration: none;
     font-weight: 600;
   }
+  .post-share {
+    display: block;
+    width: calc(100% - 30px);
+    margin: 0 15px 15px 15px;
+    background: white;
+    color: #2b3a67;
+    text-align: center;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1.5px solid #2b3a67;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .post-share:active { background: #eef1fb; }
   .empty {
     text-align: center;
     color: #999;
     margin-top: 60px;
   }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2b3a67;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 24px 0 10px;
+  }
+  .section-title:first-child { margin-top: 0; }
 
   /* lightbox sederhana */
   .lightbox {
@@ -96,7 +120,7 @@
 
 <header>
   <h1>Serba Nikmat🥵</h1>
-  <p>Update Tiap hari terbaru</p>
+  <p>Konten & Update tiap hari</p>
 </header>
 
 <div class="container" id="posts">
@@ -109,7 +133,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // GANTI dengan config Firebase Anda sendiri
 const firebaseConfig = {
@@ -120,49 +144,103 @@ const firebaseConfig = {
   messagingSenderId: "1081281593555",
   appId: "1:1081281593555:web:ab931db0e2282f8e325426"
 };
-
+ 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const postsEl = document.getElementById("posts");
-const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+const postId = new URLSearchParams(window.location.search).get("post");
 
-onSnapshot(q, (snapshot) => {
-  if (snapshot.empty) {
-    postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>';
-    return;
-  }
+function renderPost(docSnap) {
+  const data = docSnap.data();
+  const date = data.createdAt?.toDate
+    ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+    : "";
 
-  postsEl.innerHTML = "";
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    const date = data.createdAt?.toDate
-      ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
-      : "";
+  const photos = (data.photoUrls || [])
+    .map(url => `<img src="${url}" onclick="openLightbox('${url}')">`)
+    .join("");
 
-    const photos = (data.photoUrls || [])
-      .map(url => `<img src="${url}" onclick="openLightbox('${url}')">`)
-      .join("");
+  const linkBtn = data.taskLink
+    ? `<a class="post-link" href="${data.taskLink}" target="_blank" rel="noopener noreferrer">▶️</a>`
+    : "";
 
-    const linkBtn = data.taskLink
-      ? `<a class="post-link" href="${data.taskLink}" target="_blank" rel="noopener noreferrer">⏩Play Now⏪ </a>`
-      : "";
+  const caption = data.caption
+    ? `<div class="post-caption">${escapeHtml(data.caption)}</div>`
+    : "";
 
-    const caption = data.caption
-      ? `<div class="post-caption">${escapeHtml(data.caption)}</div>`
-      : "";
+  const shareUrl = `${window.location.origin}/?post=${docSnap.id}`;
 
-    const post = document.createElement("div");
-    post.className = "post";
-    post.innerHTML = `
-      <div class="post-date">${date}</div>
-      ${caption}
-      <div class="post-photos">${photos}</div>
-      ${linkBtn}
-    `;
-    postsEl.appendChild(post);
+  const post = document.createElement("div");
+  post.className = "post";
+  post.innerHTML = `
+    <div class="post-date">${date}</div>
+    ${caption}
+    <div class="post-photos">${photos}</div>
+    ${linkBtn}
+    <button class="post-share" onclick="sharePost('${shareUrl}', '${date}')">🔗 Bagikan konten Ini</button>
+  `;
+  return post;
+}
+
+if (postId) {
+  // Mode: tampilkan HANYA satu postingan sesuai link yang dibagikan
+  getDoc(doc(db, "posts", postId)).then((docSnap) => {
+    if (!docSnap.exists()) {
+      postsEl.innerHTML = '<p class="empty">Materi tidak ditemukan.</p>';
+      return;
+    }
+    postsEl.innerHTML = "";
+    postsEl.appendChild(renderPost(docSnap));
+  }).catch(() => {
+    postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>';
   });
-});
+} else {
+  // Mode: tampilkan SEMUA postingan (feed lengkap), dikelompokkan per periode
+  const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+  onSnapshot(q, (snapshot) => {
+    if (snapshot.empty) {
+      postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>';
+      return;
+    }
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+
+    const groups = { hariIni: [], mingguIni: [], lebihLama: [] };
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const created = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+      if (created && created >= startOfToday) {
+        groups.hariIni.push(docSnap);
+      } else if (created && created >= sevenDaysAgo) {
+        groups.mingguIni.push(docSnap);
+      } else {
+        groups.lebihLama.push(docSnap);
+      }
+    });
+
+    postsEl.innerHTML = "";
+    const sections = [
+      { key: "hariIni", label: "Hari Ini" },
+      { key: "mingguIni", label: "Minggu Ini" },
+      { key: "lebihLama", label: "Lebih Lama" }
+    ];
+
+    sections.forEach(({ key, label }) => {
+      if (groups[key].length === 0) return;
+      const title = document.createElement("div");
+      title.className = "section-title";
+      title.textContent = label;
+      postsEl.appendChild(title);
+      groups[key].forEach((docSnap) => {
+        postsEl.appendChild(renderPost(docSnap));
+      });
+    });
+  });
+}
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -173,6 +251,31 @@ function escapeHtml(str) {
 window.openLightbox = function(url) {
   document.getElementById("lightbox-img").src = url;
   document.getElementById("lightbox").style.display = "flex";
+};
+
+window.sharePost = async function(url, dateLabel) {
+  const shareData = {
+    title: "Catatan Kelas Bahasa Korea",
+    text: `Materi kelas tanggal ${dateLabel}`,
+    url: url
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+    } catch (err) {
+      // Pengguna membatalkan share, tidak perlu ditampilkan sebagai error
+    }
+  } else if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Link disalin! Silakan tempel ke aplikasi yang diinginkan.");
+    } catch (err) {
+      prompt("Salin link ini secara manual:", url);
+    }
+  } else {
+    prompt("Salin link ini secara manual:", url);
+  }
 };
 </script>
 
