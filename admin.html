@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin - Catatan Kelas Bahasa Korea</title>
+<title>Admin - Catatan Konten</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -110,7 +110,7 @@
 <body>
 
 <div class="card" id="loginCard">
-  <h2>🔐 Login Guru</h2>
+  <h2>🔐 Login </h2>
   <label>Email</label>
   <input type="email" id="email" placeholder="email@contoh.com">
   <label>Password</label>
@@ -120,21 +120,21 @@
 </div>
 
 <div class="card" id="formCard" style="display:none;">
-  <h2 id="formTitle">📤 Tambah Materi Baru</h2>
+  <h2 id="formTitle">📤 Tambah Konten Baru</h2>
 
-  <label>Foto materi/catatan (bisa lebih dari satu)</label>
+  <label>Foto konten/catatan (bisa lebih dari satu)</label>
   <input type="file" id="photos" accept="image/*" multiple>
   <div class="preview" id="preview"></div>
   <div class="preview" id="existingPreview"></div>
 
-  <label>Link (tugas, kuis, video, dll — bisa lebih dari satu)</label>
+  <label>Link (konten, video, dll — bisa lebih dari satu)</label>
   <div id="linksContainer"></div>
   <button type="button" id="addLinkBtn">+ Tambah Link</button>
 
-  <label>Catatan singkat (opsional)</label>
+  <label>Catatan Judul (opsional)</label>
   <textarea id="caption" placeholder="Contoh: Materi hari ini tentang 안녕하세요..."></textarea>
 
-  <button id="submitBtn">Bagikan ke Murid</button>
+  <button id="submitBtn">Bagikan Konten</button>
   <div class="msg" id="formMsg"></div>
   <div id="resultLink" style="display:none; margin-top:12px; padding:12px; background:#eef1fb; border-radius:8px; font-size:13px; word-break:break-all;"></div>
 
@@ -143,7 +143,7 @@
 </div>
 
 <div class="card" id="listCard" style="display:none;">
-  <h2>🗂️ Materi Tersimpan</h2>
+  <h2>🗂️ Konten Tersimpan</h2>
   <div id="postList"><p class="empty">Memuat...</p></div>
 </div>
 
@@ -272,8 +272,8 @@ addLinkRow(); // baris kosong pertama saat halaman dibuka
 function resetForm() {
   editingId = null;
   editingExistingPhotos = [];
-  formTitle.textContent = "📤 Tambah Materi Baru";
-  submitBtn.textContent = "Bagikan ke Murid";
+  formTitle.textContent = "📤 Tambah Konten Baru";
+  submitBtn.textContent = "Bagikan Konten";
   cancelEditBtn.style.display = "none";
   document.getElementById("photos").value = "";
   document.getElementById("preview").innerHTML = "";
@@ -333,12 +333,12 @@ submitBtn.onclick = async () => {
         createdAt: serverTimestamp()
       });
       formMsg.className = "msg success";
-      formMsg.textContent = "Berhasil dibagikan ke murid!";
+      formMsg.textContent = "Berhasil dibagikan konten!";
 
       const postUrl = `${window.location.origin}/?post=${docRef.id}`;
       const resultEl = document.getElementById("resultLink");
       resultEl.style.display = "block";
-      resultEl.innerHTML = `Link khusus materi ini:<br><b>${postUrl}</b>`;
+      resultEl.innerHTML = `Link khusus konten ini:<br><b>${postUrl}</b>`;
       resetFieldsOnly();
     }
   } catch (err) {
@@ -364,7 +364,7 @@ function resetFieldsOnly() {
 function startEdit(id, data) {
   editingId = id;
   editingExistingPhotos = data.photoUrls || [];
-  formTitle.textContent = "✏️ Edit Materi";
+  formTitle.textContent = "✏️ Edit konten";
   submitBtn.textContent = "Simpan Perubahan";
   cancelEditBtn.style.display = "block";
 
