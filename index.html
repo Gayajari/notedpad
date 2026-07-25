@@ -100,6 +100,31 @@
     font-weight: 600;
   }
   .tag-chip:active { background: #dde3f7; }
+
+  .category-bar {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 0 15px 4px 15px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .category-bar::-webkit-scrollbar { display: none; }
+  .category-chip {
+    flex: 0 0 auto;
+    text-decoration: none;
+    background: #2b3a67;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .category-chip.active {
+    background: #eef1fb;
+    color: #2b3a67;
+    border: 1.5px solid #2b3a67;
+  }
   .empty {
     text-align: center;
     color: #999;
@@ -181,6 +206,8 @@ atOptions = {
 
 <div class="contact-bar" id="contactBar"></div>
 
+<div class="category-bar" id="categoryBar"></div>
+
 <div class="container" id="posts">
   <p class="empty">Memuat konten...</p>
 </div>
@@ -209,6 +236,7 @@ const postId = new URLSearchParams(window.location.search).get("post");
 const tagParam = new URLSearchParams(window.location.search).get("tag");
 
 loadContactBar();
+loadCategoryBar();
 
 async function loadContactBar() {
   try {
@@ -230,6 +258,27 @@ async function loadContactBar() {
   } catch (err) {
     console.error("Gagal memuat pengaturan kontak:", err);
   }
+}
+
+function loadCategoryBar() {
+  const bar = document.getElementById("categoryBar");
+  const qAll = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(200));
+  onSnapshot(qAll, (snapshot) => {
+    const allTags = new Set();
+    snapshot.forEach((docSnap) => {
+      (docSnap.data().tags || []).forEach((t) => allTags.add(t));
+    });
+    if (allTags.size === 0) {
+      bar.innerHTML = "";
+      return;
+    }
+    let html = `<a class="category-chip${!tagParam ? " active" : ""}" href="${window.location.origin}/">Semua</a>`;
+    allTags.forEach((t) => {
+      const isActive = tagParam === t;
+      html += `<a class="category-chip${isActive ? " active" : ""}" href="?tag=${encodeURIComponent(t)}">#${escapeHtml(t)}</a>`;
+    });
+    bar.innerHTML = html;
+  });
 }
 
 function renderPost(docSnap) {
