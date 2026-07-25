@@ -163,7 +163,7 @@ function renderPost(docSnap) {
 
   const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   const linkBtns = linksList
-    .map(l => `<a class="post-link" href="${l.url}" target="_blank" rel="noopener noreferrer">📝 ${escapeHtml(l.label)}</a>`)
+    .map(l => `<a class="post-link" href="${l.url}" target="_blank" rel="noopener noreferrer">▶️ ${escapeHtml(l.label)}</a>`)
     .join("");
 
   const caption = data.caption
