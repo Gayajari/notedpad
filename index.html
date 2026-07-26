@@ -46,16 +46,25 @@
     white-space: pre-wrap;
   }
   .post-photos {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 4px;
     padding: 10px 15px;
   }
-  .post-photos img {
+  .post-photos.single img {
     width: 100%;
     border-radius: 8px;
     display: block;
     cursor: pointer;
+  }
+  .post-photos.multi {
+    column-count: 2;
+    column-gap: 4px;
+  }
+  .post-photos.multi img {
+    width: 100%;
+    border-radius: 8px;
+    display: block;
+    cursor: pointer;
+    margin-bottom: 4px;
+    break-inside: avoid;
   }
   .post-link {
     display: block;
@@ -101,15 +110,15 @@
   }
   .tag-chip:active { background: #dde3f7; }
 
-.category-bar {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 14px 15px 4px 15px;
-  margin-top: 14px;
-  border-top: 1px solid #e3e5ec;
-  -webkit-overflow-scrolling: touch;
-} 
+  .category-bar {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 14px 15px 4px 15px;
+    margin-top: 14px;
+    border-top: 1px solid #e3e5ec;
+    -webkit-overflow-scrolling: touch;
+  }
   .category-bar::-webkit-scrollbar { display: none; }
   .category-chip {
     flex: 0 0 auto;
@@ -289,9 +298,11 @@ function renderPost(docSnap) {
     ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
     : "";
 
-  const photos = (data.photoUrls || [])
+  const photoUrls = data.photoUrls || [];
+  const photos = photoUrls
     .map(url => `<img src="${url}" onclick="openLightbox('${url}')">`)
     .join("");
+  const photosClass = photoUrls.length > 1 ? "post-photos multi" : "post-photos single";
 
   const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   const linkBtns = linksList
@@ -315,9 +326,9 @@ function renderPost(docSnap) {
     <div class="post-date">${date}</div>
     ${caption}
     ${tagsHtml}
-    <div class="post-photos">${photos}</div>
+    <div class="${photosClass}">${photos}</div>
     ${linkBtns}
-    <button class="post-share" onclick="sharePost('${shareUrl}', '${date}')">🔗 Bagikan Konten</button>
+    <button class="post-share" onclick="sharePost('${shareUrl}')">🔗 Bagikan Konten</button>
   `;
   return post;
 }
@@ -441,12 +452,8 @@ window.openLightbox = function(url) {
   document.getElementById("lightbox").style.display = "flex";
 };
 
-window.sharePost = async function(url, dateLabel) {
-  const shareData = {
-    title: "Catatan Konten",
-    text: `Konten data tanggal ${dateLabel}`,
-    url: url
-  };
+window.sharePost = async function(url) {
+  const shareData = { url: url };
 
   if (navigator.share) {
     try {
