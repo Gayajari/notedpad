@@ -445,6 +445,13 @@ submitBtn.onclick = async () => {
       });
       formMsg.className = "msg success";
       formMsg.textContent = "Materi berhasil diperbarui!";
+
+      const editedUrl = `${window.location.origin}/?post=${editingId}`;
+      const editedResultEl = document.getElementById("resultLink");
+      editedResultEl.style.display = "block";
+      editedResultEl.innerHTML = `Link konten ini:<br><b>${editedUrl}</b><br><button type="button" class="shareBtn" style="width:auto; margin-top:8px; padding:8px 14px; font-size:12px; border-radius:6px; color:#fff; border:none; cursor:pointer;">🔗 Bagikan</button>`;
+      editedResultEl.querySelector(".shareBtn").onclick = () => sharePostLink(editedUrl);
+
       resetFieldsOnly();
     } else {
       const docRef = await addDoc(collection(db, "posts"), {
