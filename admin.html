@@ -51,6 +51,24 @@
   #cancelEditBtn { background: #999; margin-top: 8px; display: none; }
   .preview { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .preview img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; }
+  .preview-item { position: relative; width: 70px; height: 70px; }
+  .preview-item img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; display: block; }
+  .preview-item .removeBtn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #c0392b;
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    line-height: 20px;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+  }
 
   .post-item {
     border: 1px solid #eee;
@@ -73,6 +91,7 @@
   }
   .post-item .editBtn { background: #2b3a67; }
   .post-item .deleteBtn { background: #c0392b; }
+  .post-item .shareBtn { background: #197278; }
   .empty { text-align: center; color: #999; font-size: 13px; padding: 10px 0; }
 
   .link-row {
@@ -441,7 +460,8 @@ submitBtn.onclick = async () => {
       const postUrl = `${window.location.origin}/?post=${docRef.id}`;
       const resultEl = document.getElementById("resultLink");
       resultEl.style.display = "block";
-      resultEl.innerHTML = `Link khusus konten ini:<br><b>${postUrl}</b>`;
+      resultEl.innerHTML = `Link khusus konten ini:<br><b>${postUrl}</b><br><button type="button" class="shareBtn" style="width:auto; margin-top:8px; padding:8px 14px; font-size:12px; border-radius:6px; color:#fff; border:none; cursor:pointer;">🔗 Bagikan</button>`;
+      resultEl.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
       resetFieldsOnly();
     }
   } catch (err) {
@@ -485,14 +505,26 @@ function startEdit(id, data) {
   document.getElementById("resultLink").style.display = "none";
 
   existingPreview.innerHTML = "";
-  editingExistingPhotos.forEach((url) => {
-    const img = document.createElement("img");
-    img.src = url;
-    img.title = "Foto lama (akan tetap dipakai)";
-    existingPreview.appendChild(img);
-  });
+  renderExistingPreview();
 
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderExistingPreview() {
+  existingPreview.innerHTML = "";
+  editingExistingPhotos.forEach((url) => {
+    const wrap = document.createElement("div");
+    wrap.className = "preview-item";
+    wrap.innerHTML = `
+      <img src="${url}" title="Foto lama">
+      <button type="button" class="removeBtn">✕</button>
+    `;
+    wrap.querySelector(".removeBtn").onclick = () => {
+      editingExistingPhotos = editingExistingPhotos.filter(u => u !== url);
+      renderExistingPreview();
+    };
+    existingPreview.appendChild(wrap);
+  });
 }
 
 async function removePost(id) {
@@ -543,10 +575,13 @@ function listenPosts() {
         ${tagsHtml}
         <div class="actions">
           <button class="editBtn">Edit</button>
+          <button class="shareBtn">🔗 Bagikan</button>
           <button class="deleteBtn">Hapus</button>
         </div>
       `;
+      const postUrl = `${window.location.origin}/?post=${docSnap.id}`;
       item.querySelector(".editBtn").onclick = () => startEdit(docSnap.id, data);
+      item.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
       item.querySelector(".deleteBtn").onclick = () => removePost(docSnap.id);
       listEl.appendChild(item);
     });
@@ -584,6 +619,26 @@ document.getElementById("saveContactBtn").onclick = async () => {
     msgEl.textContent = "Gagal: " + err.message;
   }
 };
+
+async function sharePostLink(url) {
+  const shareData = { url: url };
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+    } catch (err) {
+      // Pengguna membatalkan share, tidak perlu ditampilkan sebagai error
+    }
+  } else if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Link disalin! Silakan tempel ke aplikasi yang diinginkan.");
+    } catch (err) {
+      prompt("Salin link ini secara manual:", url);
+    }
+  } else {
+    prompt("Salin link ini secara manual:", url);
+  }
+}
 
 function escapeHtml(str) {
   const div = document.createElement("div");
