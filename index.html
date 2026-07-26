@@ -123,17 +123,85 @@
 
   .search-bar {
     padding: 10px 15px 0 15px;
+    position: relative;
   }
-  .search-bar input {
+  .search-input-wrap {
+    position: relative;
+  }
+  .search-input-wrap input {
     width: 100%;
-    padding: 10px 14px;
+    padding: 10px 36px 10px 44px;
     border: 1px solid #ddd;
     border-radius: 20px;
     font-size: 13px;
     outline: none;
   }
-  .search-bar input:focus {
+  .search-input-wrap input:focus {
     border-color: #2b3a67;
+  }
+  .search-input-wrap #searchBtn {
+    position: absolute;
+    left: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #2b3a67;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .search-input-wrap #clearBtn {
+    display: none;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #ccc;
+    color: #333;
+    font-size: 12px;
+    line-height: 22px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .search-suggestions {
+    display: none;
+    background: #fff;
+    border-radius: 10px;
+    margin-top: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    overflow: hidden;
+  }
+  .search-suggestions.show {
+    display: block;
+  }
+  .search-suggestion-item {
+    display: block;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #222;
+    text-decoration: none;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .search-suggestion-item:last-child {
+    border-bottom: none;
+  }
+  .search-suggestion-item:active {
+    background: #f5f6fa;
+  }
+  .search-suggestion-item .tag-label {
+    color: #2b3a67;
+    font-weight: 600;
   }
   .category-chip {
     flex: 0 0 auto;
@@ -233,7 +301,12 @@ atOptions = {
 <div class="contact-bar" id="contactBar"></div>
 
 <div class="search-bar">
-  <input type="text" id="searchInput" placeholder="🔍 Cari tag atau judul...">
+  <div class="search-input-wrap">
+    <button type="button" id="searchBtn" aria-label="Cari">🔍</button>
+    <input type="text" id="searchInput" placeholder="Cari tag atau judul...">
+    <button type="button" id="clearBtn" aria-label="Hapus teks">✕</button>
+  </div>
+  <div class="search-suggestions" id="searchSuggestions"></div>
 </div>
 
 <div class="category-bar" id="categoryBar"></div>
@@ -319,39 +392,122 @@ function loadCategoryBar() {
 
 function setupSearch() {
   const input = document.getElementById("searchInput");
+  const btn = document.getElementById("searchBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const suggestBox = document.getElementById("searchSuggestions");
+
   input.addEventListener("input", (e) => {
     const qText = e.target.value.trim().toLowerCase();
+    clearBtn.style.display = e.target.value ? "block" : "none";
 
     if (!qText) {
-      searchActive = false;
-      location.reload();
+      suggestBox.classList.remove("show");
+      suggestBox.innerHTML = "";
+      if (searchActive) {
+        searchActive = false;
+        location.reload();
+      }
       return;
     }
 
-    searchActive = true;
-    const filtered = allDocsCache.filter((docSnap) => {
-      const data = docSnap.data();
-      const tags = data.tags || [];
-      const matchTag = tags.some((t) => t.toLowerCase().includes(qText));
-      const matchCaption = (data.caption || "").toLowerCase().includes(qText);
-      return matchTag || matchCaption;
-    });
+    renderSuggestions(qText);
+  });
 
-    postsEl.innerHTML = "";
-    const header = document.createElement("div");
-    header.className = "section-title";
-    header.textContent = "Hasil Pencarian";
-    postsEl.appendChild(header);
-
-    if (filtered.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "empty";
-      empty.textContent = "Tidak ada konten yang cocok.";
-      postsEl.appendChild(empty);
-    } else {
-      filtered.forEach((d) => postsEl.appendChild(renderPost(d)));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runFullSearch(input.value.trim());
     }
   });
+
+  btn.addEventListener("click", () => {
+    runFullSearch(input.value.trim());
+  });
+
+  clearBtn.addEventListener("click", () => {
+    input.value = "";
+    clearBtn.style.display = "none";
+    suggestBox.classList.remove("show");
+    suggestBox.innerHTML = "";
+    if (searchActive) {
+      searchActive = false;
+      location.reload();
+    }
+    input.focus();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!suggestBox.contains(e.target) && e.target !== input) {
+      suggestBox.classList.remove("show");
+    }
+  });
+}
+
+function renderSuggestions(qText) {
+  const suggestBox = document.getElementById("searchSuggestions");
+  const matchedTags = new Set();
+  const matchedPosts = [];
+
+  allDocsCache.forEach((docSnap) => {
+    const data = docSnap.data();
+    (data.tags || []).forEach((t) => {
+      if (t.toLowerCase().includes(qText)) matchedTags.add(t);
+    });
+    if (data.caption && data.caption.toLowerCase().includes(qText)) {
+      matchedPosts.push({ id: docSnap.id, caption: data.caption });
+    }
+  });
+
+  let html = "";
+  Array.from(matchedTags).slice(0, 5).forEach((t) => {
+    html += `<a class="search-suggestion-item" href="?tag=${encodeURIComponent(t)}">🏷️ <span class="tag-label">#${escapeHtml(t)}</span></a>`;
+  });
+  matchedPosts.slice(0, 5).forEach((p) => {
+    html += `<a class="search-suggestion-item" href="?post=${p.id}">📄 ${escapeHtml(p.caption)}</a>`;
+  });
+
+  if (!html) {
+    html = `<div class="search-suggestion-item" style="color:#999;">Tidak ada saran</div>`;
+  }
+
+  suggestBox.innerHTML = html;
+  suggestBox.classList.add("show");
+}
+
+function runFullSearch(qTextRaw) {
+  const suggestBox = document.getElementById("searchSuggestions");
+  suggestBox.classList.remove("show");
+  const qText = qTextRaw.toLowerCase();
+
+  if (!qText) {
+    searchActive = false;
+    location.reload();
+    return;
+  }
+
+  searchActive = true;
+  const filtered = allDocsCache.filter((docSnap) => {
+    const data = docSnap.data();
+    const tags = data.tags || [];
+    const matchTag = tags.some((t) => t.toLowerCase().includes(qText));
+    const matchCaption = (data.caption || "").toLowerCase().includes(qText);
+    return matchTag || matchCaption;
+  });
+
+  postsEl.innerHTML = "";
+  const header = document.createElement("div");
+  header.className = "section-title";
+  header.textContent = "Hasil Pencarian";
+  postsEl.appendChild(header);
+
+  if (filtered.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "Tidak ada konten yang cocok.";
+    postsEl.appendChild(empty);
+  } else {
+    filtered.forEach((d) => postsEl.appendChild(renderPost(d)));
+  }
 }
 
 function renderPost(docSnap) {
