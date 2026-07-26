@@ -120,6 +120,21 @@
     -webkit-overflow-scrolling: touch;
   }
   .category-bar::-webkit-scrollbar { display: none; }
+
+  .search-bar {
+    padding: 10px 15px 0 15px;
+  }
+  .search-bar input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 13px;
+    outline: none;
+  }
+  .search-bar input:focus {
+    border-color: #2b3a67;
+  }
   .category-chip {
     flex: 0 0 auto;
     text-decoration: none;
@@ -217,6 +232,10 @@ atOptions = {
 
 <div class="contact-bar" id="contactBar"></div>
 
+<div class="search-bar">
+  <input type="text" id="searchInput" placeholder="🔍 Cari tag atau judul...">
+</div>
+
 <div class="category-bar" id="categoryBar"></div>
 
 <div class="container" id="posts">
@@ -246,8 +265,12 @@ const postsEl = document.getElementById("posts");
 const postId = new URLSearchParams(window.location.search).get("post");
 const tagParam = new URLSearchParams(window.location.search).get("tag");
 
+let allDocsCache = [];
+let searchActive = false;
+
 loadContactBar();
 loadCategoryBar();
+setupSearch();
 
 async function loadContactBar() {
   try {
@@ -275,6 +298,8 @@ function loadCategoryBar() {
   const bar = document.getElementById("categoryBar");
   const qAll = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(200));
   onSnapshot(qAll, (snapshot) => {
+    allDocsCache = snapshot.docs;
+
     const allTags = new Set();
     snapshot.forEach((docSnap) => {
       (docSnap.data().tags || []).forEach((t) => allTags.add(t));
@@ -289,6 +314,43 @@ function loadCategoryBar() {
       html += `<a class="category-chip${isActive ? " active" : ""}" href="?tag=${encodeURIComponent(t)}">#${escapeHtml(t)}</a>`;
     });
     bar.innerHTML = html;
+  });
+}
+
+function setupSearch() {
+  const input = document.getElementById("searchInput");
+  input.addEventListener("input", (e) => {
+    const qText = e.target.value.trim().toLowerCase();
+
+    if (!qText) {
+      searchActive = false;
+      location.reload();
+      return;
+    }
+
+    searchActive = true;
+    const filtered = allDocsCache.filter((docSnap) => {
+      const data = docSnap.data();
+      const tags = data.tags || [];
+      const matchTag = tags.some((t) => t.toLowerCase().includes(qText));
+      const matchCaption = (data.caption || "").toLowerCase().includes(qText);
+      return matchTag || matchCaption;
+    });
+
+    postsEl.innerHTML = "";
+    const header = document.createElement("div");
+    header.className = "section-title";
+    header.textContent = "Hasil Pencarian";
+    postsEl.appendChild(header);
+
+    if (filtered.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "Tidak ada konten yang cocok.";
+      postsEl.appendChild(empty);
+    } else {
+      filtered.forEach((d) => postsEl.appendChild(renderPost(d)));
+    }
   });
 }
 
@@ -373,6 +435,7 @@ if (postId) {
 } else if (tagParam) {
   const qTag = query(collection(db, "posts"), where("tags", "array-contains", tagParam), orderBy("createdAt", "desc"));
   onSnapshot(qTag, (snapshot) => {
+    if (searchActive) return;
     postsEl.innerHTML = "";
     const header = document.createElement("div");
     header.className = "section-title";
@@ -398,6 +461,7 @@ if (postId) {
  
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
+    if (searchActive) return;
     if (snapshot.empty) {
       postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>';
       return;
