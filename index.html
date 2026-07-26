@@ -315,6 +315,8 @@ atOptions = {
   <p class="empty">Memuat konten...</p>
 </div>
 
+<div class="container" id="oldRotationWrap"></div>
+
 <div class="lightbox" id="lightbox" onclick="this.style.display='none'">
   <img id="lightbox-img" src="">
 </div>
@@ -340,6 +342,7 @@ const tagParam = new URLSearchParams(window.location.search).get("tag");
 
 let allDocsCache = [];
 let searchActive = false;
+const MAIN_FEED_LIMIT = 50;
 
 loadContactBar();
 loadCategoryBar();
@@ -372,6 +375,7 @@ function loadCategoryBar() {
   const qAll = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(200));
   onSnapshot(qAll, (snapshot) => {
     allDocsCache = snapshot.docs;
+    renderOldPostsRotation();
 
     const allTags = new Set();
     snapshot.forEach((docSnap) => {
@@ -388,6 +392,57 @@ function loadCategoryBar() {
     });
     bar.innerHTML = html;
   });
+}
+
+function renderOldPostsRotation() {
+  const wrap = document.getElementById("oldRotationWrap");
+  if (!wrap) return;
+
+  // Rotasi cuma tampil di halaman utama, bukan di mode post/tag
+  if (postId || tagParam) {
+    wrap.innerHTML = "";
+    return;
+  }
+
+  const pool = allDocsCache.slice(MAIN_FEED_LIMIT);
+  if (pool.length === 0) {
+    wrap.innerHTML = "";
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem("oldPostsRotation") || "null");
+  } catch (err) {
+    saved = null;
+  }
+
+  let chosenIds;
+  if (saved && saved.date === today && Array.isArray(saved.ids) && saved.ids.length > 0) {
+    chosenIds = saved.ids;
+  } else {
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    chosenIds = shuffled.slice(0, 3).map((d) => d.id);
+    try {
+      localStorage.setItem("oldPostsRotation", JSON.stringify({ date: today, ids: chosenIds }));
+    } catch (err) {
+      // localStorage tidak tersedia, lewati saja
+    }
+  }
+
+  const chosenDocs = chosenIds
+    .map((id) => pool.find((d) => d.id === id))
+    .filter(Boolean);
+
+  wrap.innerHTML = "";
+  if (chosenDocs.length === 0) return;
+
+  const header = document.createElement("div");
+  header.className = "section-title";
+  header.textContent = "🎲 Konten Pilihan";
+  wrap.appendChild(header);
+  chosenDocs.forEach((d) => wrap.appendChild(renderPost(d)));
 }
 
 function setupSearch() {
@@ -615,7 +670,7 @@ if (postId) {
   });
 } else {
  
-  const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+  const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(MAIN_FEED_LIMIT));
   onSnapshot(q, (snapshot) => {
     if (searchActive) return;
     if (snapshot.empty) {
