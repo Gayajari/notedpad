@@ -356,13 +356,13 @@ async function loadContactBar() {
     const bar = document.getElementById("contactBar");
     let html = "";
     if (data.telegram) {
-      html += `<a href="${data.telegram}" target="_blank" rel="noopener noreferrer">📢 Telegram</a>`;
+      html += `<a href="redirect.html?to=telegram" target="_blank" rel="noopener noreferrer">📢 Telegram</a>`;
     }
     if (data.facebook) {
-      html += `<a href="${data.facebook}" target="_blank" rel="noopener noreferrer">👀 Cara nonton</a>`;
+      html += `<a href="redirect.html?to=tutorial" target="_blank" rel="noopener noreferrer">👀 Cara nonton</a>`;
     }
     if (data.whatsapp) {
-      html += `<a href="${data.whatsapp}" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>`;
+      html += `<a href="redirect.html?to=whatsapp" target="_blank" rel="noopener noreferrer">💬 WhatsApp</a>`;
     }
     bar.innerHTML = html;
   } catch (err) {
