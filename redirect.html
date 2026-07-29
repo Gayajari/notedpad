@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Menuju Tautan... | Serba Nikmat</title>
+<style>
+  :root {
+    --brand: #2b3a67;
+    --brand-light: #eef1fb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f5f6fa;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #222;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 28px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+  }
+  .logo { font-size: 19px; font-weight: 700; color: var(--brand); margin-bottom: 6px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 22px; }
+  .timer-circle {
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 5px solid var(--brand-light); border-top-color: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 18px; font-size: 26px; font-weight: 700; color: var(--brand);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+  .timer-circle span { animation: spin 1s linear infinite reverse; }
+  .status-text { font-size: 14px; color: #555; margin-bottom: 22px; min-height: 20px; }
+  .ad-slot {
+    background: var(--brand-light); border: 1px dashed #c7cdea; border-radius: 10px;
+    min-height: 120px; display: flex; align-items: center; justify-content: center;
+    color: #99a; font-size: 12px; margin-bottom: 18px; overflow: hidden;
+  }
+  .skip-btn {
+    display: inline-block; background: var(--brand); color: #fff; border: none;
+    padding: 11px 26px; border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; opacity: 0.4; pointer-events: none; transition: all 0.3s ease; width: 100%;
+  }
+  .skip-btn.active { opacity: 1; pointer-events: auto; }
+  .skip-btn.active:active { background: #1f2c50; }
+  .error-text { color: #c0392b; font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="logo">Serba Nikmat</div>
+    <div class="subtitle">Mempersiapkan tautan kamu...</div>
+
+    <div class="timer-circle"><span id="countdown">8</span></div>
+
+    <div class="status-text" id="statusText">Mohon tunggu sebentar</div>
+
+    <!-- SLOT IKLAN BANNER 300x250 ADSTERRA -->
+    <div class="ad-slot" id="adSlot">
+      <script>
+        atOptions = {
+          'key' : '8eb886ab4511979ddc3b249d33e34725',
+          'format' : 'iframe',
+          'height' : 250,
+          'width' : 300,
+          'params' : {}
+        };
+      </script>
+      <script src="https://inputoppose.com/8eb886ab4511979ddc3b249d33e34725/invoke.js"></script>
+    </div>
+
+    <button class="skip-btn" id="skipBtn" onclick="goToTarget()">Lanjutkan</button>
+  </div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
+    authDomain: "notepad-d9f0b.firebaseapp.com",
+    projectId: "notepad-d9f0b",
+    storageBucket: "notepad-d9f0b.firebasestorage.app",
+    messagingSenderId: "1081281593555",
+    appId: "1:1081281593555:web:ab931db0e2282f8e325426"
+  };
+
+  // Link sosmed disimpan di document tunggal settings/contact (bukan collection per-id)
+  const COLLECTION_NAME = "settings";
+  const DOCUMENT_ID = "contact";
+
+  // key kiri = nilai parameter ?to=, value kanan = nama field di Firestore (settings/contact)
+  const FIELD_MAP = {
+    telegram: "telegram",
+    whatsapp: "whatsapp",
+    tutorial: "facebook"
+  };
+
+  const DURATION = 8; // detik jeda iklan
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const params = new URLSearchParams(window.location.search);
+  const toParam = params.get('to');
+
+  // Warna tema mengikuti platform tujuan
+  const THEME_MAP = {
+    telegram: { main: "#2AABEE", dark: "#1f8fc9" },
+    whatsapp: { main: "#25D366", dark: "#1da851" },
+    tutorial: { main: "#2b3a67", dark: "#1f2c50" }
+  };
+
+  if (toParam && THEME_MAP[toParam]) {
+    document.documentElement.style.setProperty('--brand', THEME_MAP[toParam].main);
+  }
+
+  const countdownEl = document.getElementById('countdown');
+  const skipBtn = document.getElementById('skipBtn');
+  const statusText = document.getElementById('statusText');
+
+  let targetURL = null;
+
+  async function loadTargetURL() {
+    if (!toParam || !FIELD_MAP[toParam]) {
+      statusText.innerHTML = '<span class="error-text">Tautan tujuan tidak valid.</span>';
+      skipBtn.style.display = 'none';
+      return;
+    }
+
+    try {
+      const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        statusText.innerHTML = '<span class="error-text">Data tidak ditemukan.</span>';
+        skipBtn.style.display = 'none';
+        return;
+      }
+
+      const data = docSnap.data();
+      const fieldName = FIELD_MAP[toParam];
+      targetURL = data[fieldName];
+
+      if (!targetURL) {
+        statusText.innerHTML = '<span class="error-text">Tautan belum diisi.</span>';
+        skipBtn.style.display = 'none';
+        return;
+      }
+
+      startCountdown();
+    } catch (err) {
+      console.error(err);
+      statusText.innerHTML = '<span class="error-text">Gagal memuat tautan. Coba lagi nanti.</span>';
+      skipBtn.style.display = 'none';
+    }
+  }
+
+  function startCountdown() {
+    let remaining = DURATION;
+    countdownEl.textContent = remaining;
+
+    const timer = setInterval(() => {
+      remaining--;
+      countdownEl.textContent = remaining;
+
+      if (remaining <= 0) {
+        clearInterval(timer);
+        countdownEl.textContent = "✓";
+        statusText.textContent = "Siap! Klik tombol di bawah untuk lanjut.";
+        skipBtn.classList.add('active');
+        setTimeout(goToTarget, 500);
+      }
+    }, 1000);
+  }
+
+  window.goToTarget = function() {
+    if (targetURL) {
+      window.location.href = targetURL;
+    }
+  };
+
+  loadTargetURL();
+</script>
+
+</body>
+</html>
