@@ -43,10 +43,11 @@
   .timer-circle span { animation: spin 1s linear infinite reverse; }
   .status-text { font-size: 14px; color: #555; margin-bottom: 22px; min-height: 20px; }
   .ad-slot {
-    background: var(--brand-light); 
+    background: var(--brand-light);
     min-height: 120px; display: flex; align-items: center; justify-content: center;
     color: #99a; font-size: 12px; margin-bottom: 18px; overflow: hidden;
   }
+  .ad-slot iframe { border: none; display: block; }
   .skip-btn {
     display: inline-block; background: var(--brand); color: #fff; border: none;
     padding: 11px 26px; border-radius: 8px; font-size: 14px; font-weight: 600;
@@ -67,22 +68,45 @@
 
     <div class="status-text" id="statusText">Mohon tunggu sebentar</div>
 
-    <!-- SLOT IKLAN BANNER 300x250 ADSTERRA -->
-    <div class="ad-slot" id="adSlot">
-      <script>
-        atOptions = {
-          'key' : '8eb886ab4511979ddc3b249d33e34725',
-          'format' : 'iframe',
-          'height' : 250,
-          'width' : 300,
-          'params' : {}
-        };
-      </script>
-      <script src="https://inputoppose.com/8eb886ab4511979ddc3b249d33e34725/invoke.js"></script>
-    </div>
+    <!-- SLOT IKLAN BANNER 300x250 -->
+    <!-- Dibungkus iframe sandbox: script iklan tetap tampil & lapor impresi
+         normal, tapi TIDAK BISA memicu redirect/navigasi sendiri tanpa klik
+         manual pengguna. Ini penting di halaman ini karena ada redirect
+         timer bawaan kita sendiri (goToTarget) -- kalau iklan dibiarkan
+         bebas, dia bisa "menyerobot" navigasi duluan sebelum timer selesai,
+         dan pengunjung nyasar ke halaman iklan alih-alih ke Telegram/WA. -->
+    <div class="ad-slot" id="adSlot"></div>
 
     <button class="skip-btn" id="skipBtn" onclick="goToTarget()">Lanjutkan</button>
   </div>
+
+<script>
+  (function () {
+    const ADS_ZONE_SQUARE = { key: "8eb886ab4511979ddc3b249d33e34725", width: 300, height: 250 };
+
+    function buildAdsIframe(zone) {
+      const iframe = document.createElement("iframe");
+      iframe.width = String(zone.width);
+      iframe.height = String(zone.height);
+      iframe.scrolling = "no";
+      iframe.loading = "lazy";
+      // allow-scripts + allow-same-origin: iklan butuh JS untuk render & lapor impresi.
+      // allow-popups + allow-popups-to-escape-sandbox + allow-top-navigation-by-user-activation:
+      // klik manual pengunjung ke iklan tetap berfungsi normal,
+      // tapi script TIDAK BISA memaksa redirect/tab baru tanpa klik.
+      iframe.sandbox = "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation";
+      iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}</style></head><body>
+        <script>
+          atOptions = { 'key': '${zone.key}', 'format': 'iframe', 'height': ${zone.height}, 'width': ${zone.width}, 'params': {} };
+        <\/script>
+        <script src="https://inputoppose.com/${zone.key}/invoke.js"><\/script>
+      </body></html>`;
+      return iframe;
+    }
+
+    document.getElementById("adSlot").appendChild(buildAdsIframe(ADS_ZONE_SQUARE));
+  })();
+</script>
 
 <!-- Firebase SDK -->
 <script type="module">
