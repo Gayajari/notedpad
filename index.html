@@ -276,6 +276,40 @@
   margin:12px auto;
  }
 
+  /* === Slot iklan native banner di dalam feed === */
+  /* max-height + overflow:hidden mencegah script iklan "membesar" jadi
+     interstitial/fullscreen. Kalau script mencoba render elemen posisi
+     fixed/absolute besar, secara visual tetap kepotong di sini. */
+  .ads-native-slot {
+    max-width: 640px;
+    max-height: 320px;
+    overflow: hidden;
+    margin: 0 auto 20px auto;
+    padding: 0 15px;
+    position: relative;
+    contain: layout style paint;
+  }
+  .ads-native-slot .ads-native-label {
+    font-size: 10px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .ads-native-slot iframe,
+  .ads-native-slot > div {
+    max-width: 100% !important;
+  }
+  .ads-native-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .ads-native-slot iframe {
+    border: none;
+    display: block;
+  }
+
 </style>
 </head>
 <body>
@@ -285,18 +319,7 @@
   <p>Konten update tiap hari</p>
 </header>
 
-<div class="ads-banner">
-<script>
-atOptions = {
-  'key': 'c815dc8b1442b1b2e98cf2ac0376024c',
-  'format': 'iframe',
-  'height': 50,
-  'width': 320,
-  'params': {}
-};
-</script>
-<script src="https://inputoppose.com/c815dc8b1442b1b2e98cf2ac0376024c/invoke.js"></script>
-</div>
+<div class="ads-banner" id="headerAdsSlot"></div>
 
 <div class="contact-bar" id="contactBar"></div>
 
@@ -343,6 +366,53 @@ const tagParam = new URLSearchParams(window.location.search).get("tag");
 let allDocsCache = [];
 let searchActive = false;
 const MAIN_FEED_LIMIT = 50;
+
+// === Konfigurasi slot iklan native ===
+const ADS_EVERY_N_POSTS = 4; // sisipkan 1 slot iklan tiap 4 post
+
+// Zona iklan atOptions (dari dashboard ad network).
+// Masing-masing dijalankan di dalam iframe terisolasi (srcdoc) supaya:
+// 1) variabel global "atOptions" antar-zona tidak saling menimpa
+// 2) auto-redirect/popup dari script iklan tidak bisa keluar dari kotaknya
+//    (sandbox hanya mengizinkan klik manual, bukan redirect paksa)
+const ADS_ZONE_SQUARE = { key: "8eb886ab4511979ddc3b249d33e34725", width: 300, height: 250 };
+const ADS_ZONE_LEADERBOARD = { key: "c815dc8b1442b1b2e98cf2ac0376024c", width: 320, height: 50 };
+
+function buildAdsIframe(zone) {
+  const iframe = document.createElement("iframe");
+  iframe.width = String(zone.width);
+  iframe.height = String(zone.height);
+  iframe.scrolling = "no";
+  iframe.loading = "lazy";
+  // allow-scripts + allow-same-origin: iklan butuh JS untuk render.
+  // allow-popups-to-escape-sandbox + allow-top-navigation-by-user-activation:
+  // klik manual pengguna tetap bisa membuka tab/link tujuan iklan,
+  // TAPI script tidak bisa memicu redirect/popup otomatis tanpa klik.
+  iframe.sandbox = "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation";
+  iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}</style></head><body>
+    <script>
+      atOptions = { 'key': '${zone.key}', 'format': 'iframe', 'height': ${zone.height}, 'width': ${zone.width}, 'params': {} };
+    <\/script>
+    <script src="https://inputoppose.com/${zone.key}/invoke.js"><\/script>
+  </body></html>`;
+  return iframe;
+}
+
+function createAdsSlot(zone, showLabel) {
+  const wrap = document.createElement("div");
+  wrap.className = "ads-native-slot";
+  wrap.style.maxHeight = `${zone.height + 24}px`;
+  if (showLabel) {
+    const label = document.createElement("div");
+    label.className = "ads-native-label";
+    label.textContent = "Sponsor";
+    wrap.appendChild(label);
+  }
+  wrap.appendChild(buildAdsIframe(zone));
+  return wrap;
+}
+
+document.getElementById("headerAdsSlot").appendChild(buildAdsIframe(ADS_ZONE_LEADERBOARD));
 
 loadContactBar();
 loadCategoryBar();
@@ -561,7 +631,12 @@ function runFullSearch(qTextRaw) {
     empty.textContent = "Tidak ada konten yang cocok.";
     postsEl.appendChild(empty);
   } else {
-    filtered.forEach((d) => postsEl.appendChild(renderPost(d)));
+    filtered.forEach((d, idx) => {
+      postsEl.appendChild(renderPost(d));
+      if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== filtered.length - 1) {
+        postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+      }
+    });
   }
 }
 
@@ -632,7 +707,12 @@ if (postId) {
       title.className = "section-title";
       title.textContent = "Konten Lainnya";
       otherWrap.appendChild(title);
-      others.forEach((d) => otherWrap.appendChild(renderPost(d)));
+      others.forEach((d, idx) => {
+        otherWrap.appendChild(renderPost(d));
+        if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== others.length - 1) {
+          otherWrap.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+        }
+      });
 
       const seeAll = document.createElement("a");
       seeAll.className = "post-link";
@@ -659,7 +739,13 @@ if (postId) {
       empty.textContent = "Belum ada konten dengan tag ini.";
       postsEl.appendChild(empty);
     } else {
-      snapshot.forEach((d) => postsEl.appendChild(renderPost(d)));
+      const docs = snapshot.docs;
+      docs.forEach((d, idx) => {
+        postsEl.appendChild(renderPost(d));
+        if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== docs.length - 1) {
+          postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+        }
+      });
     }
 
     const seeAll = document.createElement("a");
@@ -703,6 +789,10 @@ if (postId) {
       { key: "lebihLama", label: "Lebih Lama" }
     ];
 
+    // Penghitung post lintas-section, supaya iklan tersebar rata
+    // sepanjang feed bukan cuma per-section.
+    let globalPostIdx = 0;
+
     sections.forEach(({ key, label }) => {
       if (groups[key].length === 0) return;
       const title = document.createElement("div");
@@ -711,6 +801,10 @@ if (postId) {
       postsEl.appendChild(title);
       groups[key].forEach((docSnap) => {
         postsEl.appendChild(renderPost(docSnap));
+        globalPostIdx += 1;
+        if (globalPostIdx % ADS_EVERY_N_POSTS === 0) {
+          postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+        }
       });
     });
   });
@@ -748,6 +842,6 @@ window.sharePost = async function(url) {
   }
 };
 </script>
-<script src="https://inputoppose.com/84/0e/16/840e169d1e3f86906bb1490d05d95d42.js"></script>
+
 </body>
 </html>
