@@ -92,13 +92,13 @@ async function loadContactBar() {
     const bar = document.getElementById("contactBar");
     let html = "";
     if (data.telegram) {
-      html += `<a href="redirect.html?to=telegram" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg> Telegram</a>`;
+      html += `<a href="/redirect.html?to=telegram" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg> Telegram</a>`;
     }
     if (data.facebook) {
-      html += `<a href="redirect.html?to=tutorial" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg> Cara nonton</a>`;
+      html += `<a href="/redirect.html?to=tutorial" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg> Cara nonton</a>`;
     }
     if (data.whatsapp) {
-      html += `<a href="redirect.html?to=whatsapp" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.44 7.53L3 20l1.06-5.36A8.5 8.5 0 1 1 21 11.5Z"/></svg> WhatsApp</a>`;
+      html += `<a href="/redirect.html?to=whatsapp" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.44 7.53L3 20l1.06-5.36A8.5 8.5 0 1 1 21 11.5Z"/></svg> WhatsApp</a>`;
     }
     bar.innerHTML = html;
   } catch (err) {
