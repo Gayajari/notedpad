@@ -6,6 +6,12 @@ import { randomUUID } from "crypto";
 const s3 = new S3Client({
   region: "auto",
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  // WAJIB untuk Cloudflare R2: tanpa ini, AWS SDK membentuk URL virtual-hosted
+  // style (nama-bucket.account-id.r2.cloudflarestorage.com), tapi sertifikat
+  // SSL R2 tidak mendukung format itu -> muncul "SSL handshake failure".
+  // forcePathStyle memaksa format path-style (account-id.r2.cloudflarestorage.com/nama-bucket)
+  // yang didukung penuh oleh R2.
+  forcePathStyle: true,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
