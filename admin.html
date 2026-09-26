@@ -3,208 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <title>Admin - Catatan Konten</title>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: "Segoe UI", Arial, sans-serif;
-    background: #f5f6fa;
-    margin: 0;
-    padding: 20px;
-    color: #222;
-  }
-  .card {
-    max-width: 520px;
-    margin: 20px auto;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    padding: 24px;
-  }
-  h2 { margin-top: 0; font-size: 19px; }
-  label { font-size: 13px; font-weight: 600; display: block; margin: 14px 0 6px; }
-  input[type="email"], input[type="password"], input[type="url"], input[type="text"], input[type="file"], textarea {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 14px;
-  }
-  textarea { resize: vertical; min-height: 60px; }
-  button {
-    width: 100%;
-    margin-top: 18px;
-    padding: 12px;
-    background: #2b3a67;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button:disabled { opacity: 0.6; cursor: not-allowed; }
-  .msg { font-size: 13px; margin-top: 10px; }
-  .msg.error { color: #c0392b; }
-  .msg.success { color: #27ae60; }
-  #logoutBtn { background: #999; margin-top: 8px; }
-  #cancelEditBtn { background: #999; margin-top: 8px; display: none; }
-  .preview { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-  .preview img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; }
-  .preview-item { position: relative; width: 70px; height: 70px; }
-  .preview-item img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; display: block; }
-  .preview-item .removeBtn {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #c0392b;
-    color: #fff;
-    border: none;
-    font-size: 12px;
-    line-height: 20px;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-  }
-
-  .post-item {
-    border: 1px solid #eee;
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 10px;
-  }
-  .post-item .date { font-size: 11px; color: #999; }
-  .post-item .caption { font-size: 14px; margin: 4px 0; white-space: pre-wrap; }
-  .post-item .thumbs { display: flex; gap: 4px; margin: 6px 0; flex-wrap: wrap; }
-  .post-item .thumbs img { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; }
-  .post-item .link { font-size: 12px; color: #2b3a67; word-break: break-all; }
-  .post-item .actions { display: flex; gap: 8px; margin-top: 8px; }
-  .post-item .actions button {
-    width: auto;
-    margin-top: 0;
-    padding: 6px 14px;
-    font-size: 12px;
-    border-radius: 6px;
-  }
-  .post-item .editBtn { background: #2b3a67; }
-  .post-item .deleteBtn { background: #c0392b; }
-  .post-item .shareBtn { background: #197278; }
-  .empty { text-align: center; color: #999; font-size: 13px; padding: 10px 0; }
-
-  .link-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
-  }
-  .link-row input[type="text"] {
-    flex: 0 0 35%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 13px;
-  }
-  .link-row input[type="url"] {
-    flex: 1;
-  }
-  .link-row button {
-    width: auto;
-    margin: 0;
-    padding: 0 12px;
-    background: #c0392b;
-    border-radius: 8px;
-  }
-  #addLinkBtn {
-    background: white;
-    color: #2b3a67;
-    border: 1.5px dashed #2b3a67;
-    margin-top: 8px;
-    padding: 8px;
-    font-size: 13px;
-  }
-/* ===== Responsive Layout ===== */
-
-html{
-  scroll-behavior:smooth;
-}
-
-body{
-  width:100%;
-}
-
-.page-wrap{
-  width:100%;
-  max-width:700px;
-  margin:0 auto;
-  padding:16px;
-}
-
-img{
-  max-width:100%;
-  height:auto;
-  display:block;
-}
-
-iframe{
-  max-width:100%;
-}
-
-.ads-banner{
-  width:100%;
-  text-align:center;
-  margin:12px auto;
-  overflow:hidden;
-}
-
-.gallery{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:8px;
-}
-
-.gallery img{
-  width:100%;
-  border-radius:8px;
-}
-
-/* Tablet */
-@media (min-width:768px){
-  .page-wrap{
-    max-width:900px;
-    padding:24px;
-  }
-
-  .gallery{
-    gap:12px;
-  }
-
-  h1{
-    font-size:32px;
-  }
-}
-
-/* Desktop */
-@media (min-width:1200px){
-  .page-wrap{
-    max-width:1100px;
-  }
-
-  .gallery{
-    gap:16px;
-  }
-
-  h1{
-    font-size:36px;
-  }
-}
-</style>
+<link rel="stylesheet" href="/css/admin.css">
 </head>
 <body>
 
 <div class="card" id="loginCard">
-  <h2>🔐 Login </h2>
+  <h2><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Login</h2>
   <label>Email</label>
   <input type="email" id="email" placeholder="email@contoh.com">
   <label>Password</label>
@@ -214,7 +20,7 @@ iframe{
 </div>
 
 <div class="card" id="contactCard" style="display:none;">
-  <h2>🔗 Pengaturan Link Sosmed</h2>
+  <h2><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>Pengaturan Link Sosmed</h2>
   <label>Link Telegram (kosongkan jika tidak dipakai)</label>
   <input type="url" id="contactTelegram" placeholder="https://t.me/namagrup">
   <label>Link Tutorial (kosongkan jika tidak dipakai)</label>
@@ -226,7 +32,7 @@ iframe{
 </div>
 
 <div class="card" id="formCard" style="display:none;">
-  <h2 id="formTitle">📤 Tambah Konten Baru</h2>
+  <h2><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span id="formTitleText">Tambah Konten Baru</span></h2>
 
   <label>Foto konten/catatan (bisa lebih dari satu)</label>
   <input type="file" id="photos" accept="image/*" multiple>
@@ -252,407 +58,46 @@ iframe{
 </div>
 
 <div class="card" id="listCard" style="display:none;">
-  <h2>🗂️ Konten Tersimpan</h2>
+  <h2><svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>Konten Tersimpan</h2>
   <div id="postList"><p class="empty">Memuat...</p></div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<div class="crop-modal-overlay" id="cropModalOverlay">
+  <div class="crop-modal-card">
+    <button type="button" class="crop-close-btn" id="cropCloseBtn" title="Batal"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <h2 class="crop-modal-title"><svg class="icon" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>Atur Foto</h2>
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
-  authDomain: "notepad-d9f0b.firebaseapp.com",
-  projectId: "notepad-d9f0b",
-  storageBucket: "notepad-d9f0b.firebasestorage.app",
-  messagingSenderId: "1081281593555",
-  appId: "1:1081281593555:web:ab931db0e2282f8e325426"
-};
+    <div class="crop-stage-wrap">
+      <div class="crop-stage" id="cropStage">
+        <img id="cropImg" src="" alt="">
+        <div class="crop-grid"></div>
+      </div>
+    </div>
 
-// API key gratis dari https://api.imgbb.com/ - dipakai untuk upload foto
-const IMGBB_API_KEY = "d1154016bc5bb892b5be3984e885ed80";
+    <div class="crop-aspect-bar" id="cropAspectBar">
+      <button type="button" class="crop-aspect-chip active" data-ratio="0">Bebas</button>
+      <button type="button" class="crop-aspect-chip" data-ratio="1">1:1</button>
+      <button type="button" class="crop-aspect-chip" data-ratio="0.8">4:5</button>
+      <button type="button" class="crop-aspect-chip" data-ratio="0.75">3:4</button>
+      <button type="button" class="crop-aspect-chip" data-ratio="1.7778">16:9</button>
+      <button type="button" class="crop-aspect-chip" data-ratio="0.5625">9:16</button>
+    </div>
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+    <div class="crop-zoom-row">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></svg>
+      <input type="range" id="cropZoomRange" min="100" max="300" value="100">
+    </div>
+    <div class="crop-hint">Geser foto untuk atur posisi, gunakan slider untuk zoom</div>
 
-async function uploadToImgbb(file) {
-  const formData = new FormData();
-  formData.append("image", file);
-  const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-    method: "POST",
-    body: formData
-  });
-  const data = await res.json();
-  if (!data.success) {
-    throw new Error(data.error?.message || "Upload ke ImgBB gagal");
-  }
-  return data.data.url;
-}
+    <div class="crop-actions-row">
+      <button type="button" class="crop-secondary-btn" id="cropSwapBtn">Ganti Foto</button>
+      <button type="button" id="cropConfirmBtn">Gunakan Foto</button>
+    </div>
+    <input type="file" id="cropSwapInput" accept="image/*" style="display:none;">
+  </div>
+</div>
 
-const loginCard = document.getElementById("loginCard");
-const formCard = document.getElementById("formCard");
-const listCard = document.getElementById("listCard");
-const contactCard = document.getElementById("contactCard");
-const loginMsg = document.getElementById("loginMsg");
-const formMsg = document.getElementById("formMsg");
-const formTitle = document.getElementById("formTitle");
-const submitBtn = document.getElementById("submitBtn");
-const cancelEditBtn = document.getElementById("cancelEditBtn");
-const existingPreview = document.getElementById("existingPreview");
-
-let selectedFiles = [];
-let editingId = null;
-let editingExistingPhotos = [];
-
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    loginCard.style.display = "none";
-    formCard.style.display = "block";
-    listCard.style.display = "block";
-    contactCard.style.display = "block";
-    loadContactSettings();
-    listenPosts();
-  } else {
-    loginCard.style.display = "block";
-    formCard.style.display = "none";
-    listCard.style.display = "none";
-    contactCard.style.display = "none";
-  }
-});
-
-document.getElementById("loginBtn").onclick = async () => {
-  loginMsg.textContent = "";
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (err) {
-    loginMsg.textContent = "Login gagal: email/password salah.";
-  }
-};
-
-document.getElementById("logoutBtn").onclick = () => signOut(auth);
-
-document.getElementById("photos").addEventListener("change", (e) => {
-  selectedFiles = Array.from(e.target.files);
-  const preview = document.getElementById("preview");
-  preview.innerHTML = "";
-  selectedFiles.forEach(file => {
-    const img = document.createElement("img");
-    img.src = URL.createObjectURL(file);
-    preview.appendChild(img);
-  });
-});
-
-const linksContainer = document.getElementById("linksContainer");
-
-function addLinkRow(label = "", url = "") {
-  const row = document.createElement("div");
-  row.className = "link-row";
-  row.innerHTML = `
-    <input type="text" placeholder="Nama (mis. Kuis)" value="${escapeAttr(label)}">
-    <input type="url" placeholder="https://..." value="${escapeAttr(url)}">
-    <button type="button">✕</button>
-  `;
-  row.querySelector("button").onclick = () => row.remove();
-  linksContainer.appendChild(row);
-}
-
-function getLinksFromForm() {
-  const rows = linksContainer.querySelectorAll(".link-row");
-  const links = [];
-  rows.forEach((row) => {
-    const inputs = row.querySelectorAll("input");
-    const label = inputs[0].value.trim();
-    const url = inputs[1].value.trim();
-    if (url) {
-      links.push({ label: label || "Buka video", url });
-    }
-  });
-  return links;
-}
-
-function getTagsFromForm() {
-  const raw = document.getElementById("tags").value.trim();
-  if (!raw) return [];
-  return raw.split(",").map(t => t.trim()).filter(Boolean);
-}
-
-function escapeAttr(str) {
-  return String(str).replace(/"/g, "&quot;");
-}
-
-document.getElementById("addLinkBtn").onclick = () => addLinkRow();
-addLinkRow(); // baris kosong pertama saat halaman dibuka
-
-function resetForm() {
-  editingId = null;
-  editingExistingPhotos = [];
-  formTitle.textContent = "📤 Tambah Konten Baru";
-  submitBtn.textContent = "Bagikan Konten";
-  cancelEditBtn.style.display = "none";
-  document.getElementById("photos").value = "";
-  document.getElementById("preview").innerHTML = "";
-  existingPreview.innerHTML = "";
-  linksContainer.innerHTML = "";
-  addLinkRow();
-  document.getElementById("tags").value = "";
-  document.getElementById("caption").value = "";
-  document.getElementById("resultLink").style.display = "none";
-  selectedFiles = [];
-  formMsg.textContent = "";
-}
-
-cancelEditBtn.onclick = resetForm;
-
-submitBtn.onclick = async () => {
-  formMsg.className = "msg";
-  formMsg.textContent = "";
-
-  const links = getLinksFromForm();
-  const tags = getTagsFromForm();
-  const caption = document.getElementById("caption").value.trim();
-
-  if (selectedFiles.length === 0 && editingExistingPhotos.length === 0 && links.length === 0 && !caption) {
-    formMsg.className = "msg error";
-    formMsg.textContent = "Isi minimal satu: foto, link, atau catatan.";
-    return;
-  }
-
-  submitBtn.disabled = true;
-  formMsg.textContent = "Memproses...";
-
-  try {
-    const photoUrls = [...editingExistingPhotos];
-    let i = 0;
-    for (const file of selectedFiles) {
-      i++;
-      formMsg.textContent = `Mengunggah foto ${i} dari ${selectedFiles.length}...`;
-      const url = await uploadToImgbb(file);
-      photoUrls.push(url);
-    }
-
-    formMsg.textContent = "Menyimpan data...";
-
-    if (editingId) {
-      await updateDoc(doc(db, "posts", editingId), {
-        photoUrls,
-        links,
-        tags,
-        caption: caption || null
-      });
-      formMsg.className = "msg success";
-      formMsg.textContent = "Materi berhasil diperbarui!";
-
-      const editedUrl = `${window.location.origin}/?post=${editingId}`;
-      const editedResultEl = document.getElementById("resultLink");
-      editedResultEl.style.display = "block";
-      editedResultEl.innerHTML = `Link konten ini:<br><b>${editedUrl}</b><br><button type="button" class="shareBtn" style="width:auto; margin-top:8px; padding:8px 14px; font-size:12px; border-radius:6px; color:#fff; border:none; cursor:pointer;">🔗 Bagikan</button>`;
-      editedResultEl.querySelector(".shareBtn").onclick = () => sharePostLink(editedUrl);
-
-      resetFieldsOnly();
-    } else {
-      const docRef = await addDoc(collection(db, "posts"), {
-        photoUrls,
-        links,
-        tags,
-        caption: caption || null,
-        createdAt: serverTimestamp()
-      });
-      formMsg.className = "msg success";
-      formMsg.textContent = "Berhasil dibagikan konten!";
-
-      const postUrl = `${window.location.origin}/?post=${docRef.id}`;
-      const resultEl = document.getElementById("resultLink");
-      resultEl.style.display = "block";
-      resultEl.innerHTML = `Link khusus konten ini:<br><b>${postUrl}</b><br><button type="button" class="shareBtn" style="width:auto; margin-top:8px; padding:8px 14px; font-size:12px; border-radius:6px; color:#fff; border:none; cursor:pointer;">🔗 Bagikan</button>`;
-      resultEl.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
-      resetFieldsOnly();
-    }
-  } catch (err) {
-    formMsg.className = "msg error";
-    formMsg.textContent = "Gagal: " + err.message;
-    console.error(err);
-  } finally {
-    submitBtn.disabled = false;
-  }
-};
-
-function resetFieldsOnly() {
-  document.getElementById("photos").value = "";
-  document.getElementById("preview").innerHTML = "";
-  selectedFiles = [];
-  if (!editingId) {
-    linksContainer.innerHTML = "";
-    addLinkRow();
-    document.getElementById("tags").value = "";
-    document.getElementById("caption").value = "";
-  }
-}
-
-function startEdit(id, data) {
-  editingId = id;
-  editingExistingPhotos = data.photoUrls || [];
-  formTitle.textContent = "✏️ Edit konten";
-  submitBtn.textContent = "Simpan Perubahan";
-  cancelEditBtn.style.display = "block";
-
-  linksContainer.innerHTML = "";
-  const existingLinks = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
-  if (existingLinks.length === 0) {
-    addLinkRow();
-  } else {
-    existingLinks.forEach(l => addLinkRow(l.label, l.url));
-  }
-
-  document.getElementById("tags").value = (data.tags || []).join(", ");
-  document.getElementById("caption").value = data.caption || "";
-  document.getElementById("resultLink").style.display = "none";
-
-  existingPreview.innerHTML = "";
-  renderExistingPreview();
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function renderExistingPreview() {
-  existingPreview.innerHTML = "";
-  editingExistingPhotos.forEach((url) => {
-    const wrap = document.createElement("div");
-    wrap.className = "preview-item";
-    wrap.innerHTML = `
-      <img src="${url}" title="Foto lama">
-      <button type="button" class="removeBtn">✕</button>
-    `;
-    wrap.querySelector(".removeBtn").onclick = () => {
-      editingExistingPhotos = editingExistingPhotos.filter(u => u !== url);
-      renderExistingPreview();
-    };
-    existingPreview.appendChild(wrap);
-  });
-}
-
-async function removePost(id) {
-  if (!confirm("Yakin hapus materi ini? Tidak bisa dikembalikan.")) return;
-  try {
-    await deleteDoc(doc(db, "posts", id));
-  } catch (err) {
-    alert("Gagal menghapus: " + err.message);
-  }
-}
-
-function listenPosts() {
-  const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-  onSnapshot(q, (snapshot) => {
-    const listEl = document.getElementById("postList");
-    if (snapshot.empty) {
-      listEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
-      return;
-    }
-    listEl.innerHTML = "";
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const date = data.createdAt?.toDate
-        ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
-        : "";
-
-      const thumbs = (data.photoUrls || [])
-        .map(url => `<img src="${url}">`)
-        .join("");
-
-      const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
-      const linksHtml = linksList
-        .map(l => `<div class="link">🔗 ${escapeHtml(l.label)}: ${escapeHtml(l.url)}</div>`)
-        .join("");
-
-      const tagsList = data.tags || [];
-      const tagsHtml = tagsList.length
-        ? `<div class="link">🏷️ ${tagsList.map(t => escapeHtml(t)).join(", ")}</div>`
-        : "";
-
-      const item = document.createElement("div");
-      item.className = "post-item";
-      item.innerHTML = `
-        <div class="date">${date}</div>
-        ${data.caption ? `<div class="caption">${escapeHtml(data.caption)}</div>` : ""}
-        <div class="thumbs">${thumbs}</div>
-        ${linksHtml}
-        ${tagsHtml}
-        <div class="actions">
-          <button class="editBtn">Edit</button>
-          <button class="shareBtn">🔗 Bagikan</button>
-          <button class="deleteBtn">Hapus</button>
-        </div>
-      `;
-      const postUrl = `${window.location.origin}/?post=${docSnap.id}`;
-      item.querySelector(".editBtn").onclick = () => startEdit(docSnap.id, data);
-      item.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
-      item.querySelector(".deleteBtn").onclick = () => removePost(docSnap.id);
-      listEl.appendChild(item);
-    });
-  });
-}
-
-async function loadContactSettings() {
-  try {
-    const snap = await getDoc(doc(db, "settings", "contact"));
-    if (snap.exists()) {
-      const data = snap.data();
-      document.getElementById("contactTelegram").value = data.telegram || "";
-      document.getElementById("contactFacebook").value = data.facebook || "";
-      document.getElementById("contactWhatsapp").value = data.whatsapp || "";
-    }
-  } catch (err) {
-    console.error("Gagal memuat pengaturan kontak:", err);
-  }
-}
-
-document.getElementById("saveContactBtn").onclick = async () => {
-  const msgEl = document.getElementById("contactMsg");
-  msgEl.className = "msg";
-  msgEl.textContent = "Menyimpan...";
-  try {
-    await setDoc(doc(db, "settings", "contact"), {
-      telegram: document.getElementById("contactTelegram").value.trim() || null,
-      facebook: document.getElementById("contactFacebook").value.trim() || null,
-      whatsapp: document.getElementById("contactWhatsapp").value.trim() || null
-    });
-    msgEl.className = "msg success";
-    msgEl.textContent = "Pengaturan link sosmed berhasil disimpan!";
-  } catch (err) {
-    msgEl.className = "msg error";
-    msgEl.textContent = "Gagal: " + err.message;
-  }
-};
-
-async function sharePostLink(url) {
-  const shareData = { url: url };
-  if (navigator.share) {
-    try {
-      await navigator.share(shareData);
-    } catch (err) {
-      // Pengguna membatalkan share, tidak perlu ditampilkan sebagai error
-    }
-  } else if (navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(url);
-      alert("Link disalin! Silakan tempel ke aplikasi yang diinginkan.");
-    } catch (err) {
-      prompt("Salin link ini secara manual:", url);
-    }
-  } else {
-    prompt("Salin link ini secara manual:", url);
-  }
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-</script>
+<script type="module" src="/js/admin.js"></script>
 
 </body>
 </html>
