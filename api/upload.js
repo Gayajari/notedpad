@@ -61,7 +61,6 @@ export default async function handler(req, res) {
     // style (nama-bucket.account-id.r2.cloudflarestorage.com), tapi sertifikat
     // SSL R2 tidak mendukung format itu -> muncul "SSL handshake failure".
     // forcePathStyle memaksa format path-style yang didukung penuh oleh R2.
-    forcePathStyle: true,
     credentials: { accessKeyId, secretAccessKey },
   });
 
