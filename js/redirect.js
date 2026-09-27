@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ================== SLOT IKLAN BANNER 300x250 ==================
    Dibungkus iframe sandbox: script iklan tetap tampil & lapor impresi
@@ -60,6 +60,12 @@ const DURATION = 5; // detik jeda iklan
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Sama seperti index.js -- cache lokal biar link Telegram/WhatsApp/Tutorial
+// yang sering diklik pengunjung tidak perlu selalu tarik ulang dari server.
+enableIndexedDbPersistence(db).catch((err) => {
+  console.warn("Cache lokal Firestore tidak aktif:", err.code || err);
+});
 
 const params = new URLSearchParams(window.location.search);
 const toParam = params.get('to');

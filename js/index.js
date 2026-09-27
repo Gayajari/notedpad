@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -11,6 +11,24 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Cache lokal (IndexedDB) -- data post/settings yang sudah pernah diambil
+// disimpan di browser pengunjung. Kunjungan berikutnya, Firestore langsung
+// sajikan dulu dari cache ini (instan, tanpa request jaringan), baru
+// disinkronkan lagi ke server di belakang layar. Iritnya di bandwidth
+// terasa terutama untuk pengunjung yang bolak-balik buka situs ini.
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code === "failed-precondition") {
+    // Situs ini sedang terbuka di beberapa tab sekaligus -- cache lokal
+    // cuma bisa aktif di satu tab dalam satu waktu. Situs tetap jalan
+    // normal, cuma tanpa cache di tab-tab tambahan itu.
+    console.warn("Cache lokal Firestore tidak aktif: situs terbuka di beberapa tab.");
+  } else if (err.code === "unimplemented") {
+    console.warn("Cache lokal Firestore tidak didukung browser ini.");
+  } else {
+    console.warn("Gagal mengaktifkan cache lokal Firestore:", err);
+  }
+});
 
 const postsEl = document.getElementById("posts");
 const shortCodeMatch = window.location.pathname.match(/^\/p\/([A-Za-z]{6})\/?$/);

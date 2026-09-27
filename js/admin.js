@@ -49,28 +49,6 @@ function fileToBase64(file) {
   });
 }
 
-// Hapus file dari Cloudflare R2 lewat /api/delete. Best-effort: dipanggil
-// tanpa menghalangi alur utama (simpan/hapus post di Firestore tetap jalan
-// walau ini gagal) -- tapi tetap diusahakan supaya file R2 tidak menumpuk
-// jadi sampah setiap kali foto/post dihapus dari admin.
-async function deleteFromCloudflare(urls) {
-  const list = (urls || []).filter(Boolean);
-  if (list.length === 0) return;
-  try {
-    const res = await fetch("/api/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls: list })
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      console.error("Gagal menghapus foto lama dari Cloudflare R2:", data.error || res.status);
-    }
-  } catch (err) {
-    console.error("Gagal menghapus foto lama dari Cloudflare R2:", err);
-  }
-}
-
 // Kode pendek 6 karakter (huruf besar & kecil saja) untuk link domain/p/KODE
 const CODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 function generateCode() {
@@ -105,7 +83,6 @@ let selectedFiles = [];
 let editingId = null;
 let editingExistingPhotos = [];
 let editingCode = null;
-let removedExistingPhotos = []; // foto lama yang dibuang selama sesi edit ini, baru benar-benar dihapus dari R2 saat Simpan Perubahan berhasil
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
@@ -451,7 +428,6 @@ function resetForm() {
   editingId = null;
   editingExistingPhotos = [];
   editingCode = null;
-  removedExistingPhotos = [];
   formTitle.textContent = "Tambah Konten Baru";
   submitBtn.textContent = "Bagikan Konten";
   cancelEditBtn.style.display = "none";
@@ -513,15 +489,6 @@ submitBtn.onclick = async () => {
       formMsg.className = "msg success";
       formMsg.textContent = "Materi berhasil diperbarui!";
 
-      // Foto lama yang dibuang/diganti selama sesi edit ini BARU sekarang
-      // benar-benar dihapus dari R2 -- setelah dipastikan perubahan post-nya
-      // berhasil tersimpan (bukan saat tombol ✕ diklik), supaya kalau admin
-      // batal edit, foto lama tidak ikut kehapus sia-sia.
-      if (removedExistingPhotos.length > 0) {
-        deleteFromCloudflare(removedExistingPhotos);
-        removedExistingPhotos = [];
-      }
-
       const editedUrl = `${window.location.origin}/p/${editingCode}`;
       const editedResultEl = document.getElementById("resultLink");
       editedResultEl.style.display = "block";
@@ -575,7 +542,6 @@ function startEdit(id, data) {
   editingId = id;
   editingExistingPhotos = data.photoUrls || [];
   editingCode = data.code || null;
-  removedExistingPhotos = [];
   selectedFiles = [];
   document.getElementById("preview").innerHTML = "";
   formTitle.textContent = "Edit konten";
@@ -612,7 +578,6 @@ function renderExistingPreview() {
     `;
     wrap.querySelector(".removeBtn").onclick = () => {
       editingExistingPhotos = editingExistingPhotos.filter(u => u !== url);
-      removedExistingPhotos.push(url);
       renderExistingPreview();
     };
     wrap.querySelector(".editCropBtn").onclick = () => {
@@ -631,7 +596,6 @@ function renderExistingPreview() {
         const cropped = await openCropperForFile(file);
         if (cropped) {
           editingExistingPhotos = editingExistingPhotos.filter(u => u !== url);
-          removedExistingPhotos.push(url);
           selectedFiles.push(makeCroppedFile(cropped, file.name));
           renderExistingPreview();
           renderNewPreview();
@@ -644,16 +608,10 @@ function renderExistingPreview() {
   });
 }
 
-async function removePost(id, photoUrls) {
+async function removePost(id) {
   if (!confirm("Yakin hapus materi ini? Tidak bisa dikembalikan.")) return;
   try {
     await deleteDoc(doc(db, "posts", id));
-    // Post-nya sudah pasti terhapus dari Firestore -- sekarang hapus juga
-    // semua foto post ini dari Cloudflare R2 supaya tidak jadi file yatim
-    // yang menumpuk (tetap memakan kuota storage walau tidak terpakai lagi).
-    if (photoUrls && photoUrls.length > 0) {
-      deleteFromCloudflare(photoUrls);
-    }
   } catch (err) {
     alert("Gagal menghapus: " + err.message);
   }
@@ -707,7 +665,7 @@ function listenPosts() {
         : `${window.location.origin}/?post=${docSnap.id}`;
       item.querySelector(".editBtn").onclick = () => startEdit(docSnap.id, data);
       item.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
-      item.querySelector(".deleteBtn").onclick = () => removePost(docSnap.id, data.photoUrls);
+      item.querySelector(".deleteBtn").onclick = () => removePost(docSnap.id);
       listEl.appendChild(item);
     });
   });
