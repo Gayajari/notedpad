@@ -15,6 +15,114 @@
     padding: 24px;
   }
   h2 { margin-top: 0; font-size: 19px; display: flex; align-items: center; gap: 7px; }
+
+  /* ================== ACCORDION PENGATURAN ==================
+     Dipakai untuk semua bagian "pengaturan" di dasbor -- disembunyikan
+     dulu secara default, isinya baru muncul kalau bar-nya diklik. Bikin
+     halaman awal lebih ringkas, tapi tetap bisa diakses kalau perlu. */
+  .accordion-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+    color: #222;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+  }
+  .accordion-toggle .accordion-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .accordion-arrow {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+    color: #999;
+  }
+  .accordion-toggle.open .accordion-arrow { transform: rotate(180deg); }
+  .accordion-body {
+    display: none;
+    margin-top: 14px;
+  }
+  .accordion-body.open { display: block; }
+
+  /* ================== SEARCH & SORT DI DAFTAR KONTEN ================== */
+  .admin-search-wrap { position: relative; margin-bottom: 12px; }
+  .admin-search-wrap input {
+    width: 100%;
+    padding: 9px 34px 9px 12px;
+    border: 1.5px solid #ddd;
+    border-radius: 999px;
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+  .admin-search-wrap .clearSearchBtn {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    margin: 0;
+    background: rgba(0,0,0,0.06);
+    border: none;
+    border-radius: 50%;
+    color: #555;
+    cursor: pointer;
+  }
+  .admin-search-count {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 10px;
+  }
+  .admin-sort-chip-bar {
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    background: #f5f6fa;
+    border: 1.5px solid #ddd;
+    border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  .admin-sort-chip {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    background: transparent;
+    border: none;
+    color: #666;
+    padding: 7px 4px;
+    margin: 0;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .admin-sort-chip.active { background: #2b3a67; color: #fff; }
+  .post-item mark {
+    background: rgba(255,183,3,0.55);
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 3px;
+  }
+  .post-item .views-count { color: #197278; font-weight: 600; }
   .icon {
     width: 18px;
     height: 18px;
