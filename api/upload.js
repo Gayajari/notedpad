@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
+import { verifyAdminRequest } from "../lib/verifyAuth.js";
 
 export const config = {
   api: {
@@ -21,6 +22,14 @@ function getEnv(name) {
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Cuma admin yang sudah login di /dasbor yang boleh upload -- mencegah
+  // siapa saja dari luar memanggil endpoint ini langsung untuk mengisi
+  // bucket R2 dengan file sembarangan.
+  const auth = await verifyAdminRequest(req);
+  if (!auth.ok) {
+    return res.status(401).json({ error: auth.error });
   }
 
   const accountId = getEnv("R2_ACCOUNT_ID");

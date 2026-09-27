@@ -1,4 +1,5 @@
 import { S3Client, DeleteObjectsCommand } from "@aws-sdk/client-s3";
+import { verifyAdminRequest } from "../lib/verifyAuth.js";
 
 export const config = {
   api: {
@@ -16,6 +17,12 @@ function getEnv(name) {
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Sama seperti upload.js -- cuma admin yang login yang boleh hapus file.
+  const auth = await verifyAdminRequest(req);
+  if (!auth.ok) {
+    return res.status(401).json({ error: auth.error });
   }
 
   const accountId = getEnv("R2_ACCOUNT_ID");
