@@ -20,15 +20,20 @@
 </div>
 
 <div class="card" id="contactCard" style="display:none;">
-  <h2><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>Pengaturan Link Sosmed</h2>
-  <label>Link Telegram (kosongkan jika tidak dipakai)</label>
-  <input type="url" id="contactTelegram" placeholder="https://t.me/namagrup">
-  <label>Link Tutorial (kosongkan jika tidak dipakai)</label>
-  <input type="url" id="contactFacebook" placeholder="https://Tutorial.com/xxxx">
-  <label>Link WhatsApp (kosongkan jika tidak dipakai)</label>
-  <input type="url" id="contactWhatsapp" placeholder="https://chat.whatsapp.com/xxxx">
-  <button id="saveContactBtn">Simpan Pengaturan</button>
-  <div class="msg" id="contactMsg"></div>
+  <button type="button" class="accordion-toggle" id="contactToggle">
+    <span class="accordion-label"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>Pengaturan Link Sosmed</span>
+    <svg class="icon accordion-arrow" id="contactArrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+  <div class="accordion-body" id="contactBody">
+    <label>Link Telegram (kosongkan jika tidak dipakai)</label>
+    <input type="url" id="contactTelegram" placeholder="https://t.me/namagrup">
+    <label>Link Tutorial (kosongkan jika tidak dipakai)</label>
+    <input type="url" id="contactFacebook" placeholder="https://Tutorial.com/xxxx">
+    <label>Link WhatsApp (kosongkan jika tidak dipakai)</label>
+    <input type="url" id="contactWhatsapp" placeholder="https://chat.whatsapp.com/xxxx">
+    <button id="saveContactBtn">Simpan Pengaturan</button>
+    <div class="msg" id="contactMsg"></div>
+  </div>
 </div>
 
 <div class="card" id="formCard" style="display:none;">
@@ -59,6 +64,19 @@
 
 <div class="card" id="listCard" style="display:none;">
   <h2><svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>Konten Tersimpan</h2>
+
+  <div class="admin-search-wrap">
+    <input type="text" id="adminSearchInput" placeholder="Cari judul, tag, atau link...">
+    <button type="button" class="clearSearchBtn" id="adminSearchClear"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="admin-search-count" id="adminSearchCount"></div>
+
+  <div class="admin-sort-chip-bar" id="adminSortChipBar">
+    <button type="button" class="admin-sort-chip active" data-sort="terbaru">Terbaru</button>
+    <button type="button" class="admin-sort-chip" data-sort="terlama">Terlama</button>
+    <button type="button" class="admin-sort-chip" data-sort="terpopuler">Terpopuler</button>
+  </div>
+
   <div id="postList"><p class="empty">Memuat...</p></div>
 </div>
 
