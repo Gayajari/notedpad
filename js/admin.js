@@ -19,6 +19,7 @@ const db = getFirestore(app);
 const shareIconSvg = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:4px;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>`;
 const linkIconSvgSmall = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:3px;"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>`;
 const tagIconSvgSmall = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:3px;"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4A2 2 0 0 1 2 11V4a2 2 0 0 1 2-2h7a2 2 0 0 1 1.41.59l8.18 8.18a2 2 0 0 1 0 2.83Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>`;
+const eyeIconSvgSmall = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>`;
 
 // Upload foto lewat serverless function /api/upload (Vercel), yang
 // meneruskan file ke Cloudflare R2. Lihat api/upload.js.
@@ -122,6 +123,21 @@ onAuthStateChanged(auth, (user) => {
     contactCard.style.display = "none";
   }
 });
+
+// Accordion pengaturan: disembunyikan dulu, baru muncul kalau bar-nya
+// diklik. Dipakai untuk semua bagian "pengaturan" di dasbor (saat ini baru
+// Link Sosmed, tapi pola ini scalable untuk pengaturan lain di masa depan).
+function setupAccordion(toggleId, bodyId, arrowIcon) {
+  const toggleBtn = document.getElementById(toggleId);
+  const body = document.getElementById(bodyId);
+  if (!toggleBtn || !body) return;
+  toggleBtn.addEventListener("click", () => {
+    const willOpen = !body.classList.contains("open");
+    body.classList.toggle("open", willOpen);
+    toggleBtn.classList.toggle("open", willOpen);
+  });
+}
+setupAccordion("contactToggle", "contactBody");
 
 document.getElementById("loginBtn").onclick = async () => {
   loginMsg.textContent = "";
@@ -659,57 +675,166 @@ async function removePost(id, photoUrls) {
   }
 }
 
+let allPostsCache = []; // [{ id, data }] -- semua post, hasil listener realtime
+let currentAdminSort = "terbaru";
+
 function listenPosts() {
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
-    const listEl = document.getElementById("postList");
-    if (snapshot.empty) {
-      listEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
-      return;
-    }
-    listEl.innerHTML = "";
+    allPostsCache = [];
     snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const date = data.createdAt?.toDate
-        ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
-        : "";
-
-      const thumbs = (data.photoUrls || [])
-        .map(url => `<img src="${url}">`)
-        .join("");
-
-      const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
-      const linksHtml = linksList
-        .map(l => `<div class="link">${linkIconSvgSmall}${escapeHtml(l.label)}: ${escapeHtml(l.url)}</div>`)
-        .join("");
-
-      const tagsList = data.tags || [];
-      const tagsHtml = tagsList.length
-        ? `<div class="link">${tagIconSvgSmall}${tagsList.map(t => escapeHtml(t)).join(", ")}</div>`
-        : "";
-
-      const item = document.createElement("div");
-      item.className = "post-item";
-      item.innerHTML = `
-        <div class="date">${date}</div>
-        ${data.caption ? `<div class="caption">${escapeHtml(data.caption)}</div>` : ""}
-        <div class="thumbs">${thumbs}</div>
-        ${linksHtml}
-        ${tagsHtml}
-        <div class="actions">
-          <button class="editBtn">Edit</button>
-          <button class="shareBtn">Bagikan</button>
-          <button class="deleteBtn">Hapus</button>
-        </div>
-      `;
-      const postUrl = data.code
-        ? `${window.location.origin}/p/${data.code}`
-        : `${window.location.origin}/?post=${docSnap.id}`;
-      item.querySelector(".editBtn").onclick = () => startEdit(docSnap.id, data);
-      item.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
-      item.querySelector(".deleteBtn").onclick = () => removePost(docSnap.id, data.photoUrls);
-      listEl.appendChild(item);
+      allPostsCache.push({ id: docSnap.id, data: docSnap.data() });
     });
+    applyAdminSearch();
+  });
+}
+
+function normalizeSearchText(str) {
+  return (str || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // buang diakritik biar lebih akurat
+    .trim();
+}
+
+// Cari MENYELURUH: judul (caption), tag, DAN teks/URL setiap link (termasuk
+// yang berfungsi sebagai info "SEO" per post -- label link biasanya berisi
+// kata kunci konten itu). Semua digabung jadi satu blok teks lalu dicari.
+function getPostSearchBlob(data) {
+  const tagsList = data.tags || [];
+  const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
+  const parts = [
+    data.caption || "",
+    tagsList.join(" "),
+    linksList.map(l => `${l.label || ""} ${l.url || ""}`).join(" "),
+    data.code || ""
+  ];
+  return normalizeSearchText(parts.join(" "));
+}
+
+function highlightMatch(text, terms) {
+  if (!text) return "";
+  let escaped = escapeHtml(text);
+  if (!terms.length) return escaped;
+  terms.forEach(term => {
+    if (!term) return;
+    const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp("(" + safeTerm + ")", "gi");
+    escaped = escaped.replace(re, "<mark>$1</mark>");
+  });
+  return escaped;
+}
+
+function sortAdminPosts(list) {
+  const arr = [...list];
+  if (currentAdminSort === "terlama") {
+    arr.reverse();
+  } else if (currentAdminSort === "terpopuler") {
+    arr.sort((a, b) => (b.data.postViews || 0) - (a.data.postViews || 0));
+  }
+  return arr;
+}
+
+const adminSortBarEl = document.getElementById("adminSortChipBar");
+if (adminSortBarEl) {
+  adminSortBarEl.querySelectorAll(".admin-sort-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      adminSortBarEl.querySelectorAll(".admin-sort-chip").forEach((t) => t.classList.remove("active"));
+      btn.classList.add("active");
+      currentAdminSort = btn.dataset.sort;
+      applyAdminSearch();
+    });
+  });
+}
+
+document.getElementById("adminSearchInput").addEventListener("input", applyAdminSearch);
+document.getElementById("adminSearchClear").addEventListener("click", () => {
+  document.getElementById("adminSearchInput").value = "";
+  applyAdminSearch();
+  document.getElementById("adminSearchInput").focus();
+});
+
+function applyAdminSearch() {
+  const listEl = document.getElementById("postList");
+  const countEl = document.getElementById("adminSearchCount");
+  const clearBtn = document.getElementById("adminSearchClear");
+  const rawQuery = document.getElementById("adminSearchInput").value;
+  const normalizedQuery = normalizeSearchText(rawQuery);
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+
+  clearBtn.style.display = rawQuery ? "flex" : "none";
+
+  const filtered = terms.length
+    ? allPostsCache.filter(({ data }) => {
+        const blob = getPostSearchBlob(data);
+        return terms.every(term => blob.includes(term));
+      })
+    : allPostsCache;
+
+  if (terms.length) {
+    countEl.textContent = `${filtered.length} dari ${allPostsCache.length} postingan cocok`;
+  } else {
+    countEl.textContent = "";
+  }
+
+  if (allPostsCache.length === 0) {
+    listEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
+    return;
+  }
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<p class="empty">Tidak ada postingan yang cocok dengan pencarian.</p>';
+    return;
+  }
+
+  listEl.innerHTML = "";
+  sortAdminPosts(filtered).forEach(({ id, data }) => {
+    const date = data.createdAt?.toDate
+      ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "";
+
+    const thumbs = (data.photoUrls || [])
+      .map(url => `<img src="${url}">`)
+      .join("");
+
+    const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
+    const linksHtml = linksList
+      .map(l => `<div class="link">${linkIconSvgSmall}${highlightMatch(l.label, terms)}: ${highlightMatch(l.url, terms)}</div>`)
+      .join("");
+
+    const tagsList = data.tags || [];
+    const tagsHtml = tagsList.length
+      ? `<div class="link">${tagIconSvgSmall}${tagsList.map(t => highlightMatch(t, terms)).join(", ")}</div>`
+      : "";
+
+    // "Dilihat" = berapa kali post/gambarnya DIBUKA lewat link (/p/kode).
+    // "Klik link" = berapa kali tombol link video di dalamnya DIKLIK.
+    // Dua metrik terpisah -- yang satu soal post-nya, yang satu soal link-nya.
+    const postViews = data.postViews || 0;
+    const linkClicks = data.linkClicks || 0;
+    const viewsHtml = `<div class="link views-count">${eyeIconSvgSmall}${postViews} dilihat &nbsp;·&nbsp; ${linkIconSvgSmall}${linkClicks} klik link</div>`;
+
+    const item = document.createElement("div");
+    item.className = "post-item";
+    item.innerHTML = `
+      <div class="date">${date}</div>
+      ${data.caption ? `<div class="caption">${highlightMatch(data.caption, terms)}</div>` : ""}
+      <div class="thumbs">${thumbs}</div>
+      ${linksHtml}
+      ${tagsHtml}
+      ${viewsHtml}
+      <div class="actions">
+        <button class="editBtn">Edit</button>
+        <button class="shareBtn">Bagikan</button>
+        <button class="deleteBtn">Hapus</button>
+      </div>
+    `;
+    const postUrl = data.code
+      ? `${window.location.origin}/p/${data.code}`
+      : `${window.location.origin}/?post=${id}`;
+    item.querySelector(".editBtn").onclick = () => startEdit(id, data);
+    item.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
+    item.querySelector(".deleteBtn").onclick = () => removePost(id, data.photoUrls);
+    listEl.appendChild(item);
   });
 }
 

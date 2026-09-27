@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -339,7 +339,7 @@ function renderPost(docSnap) {
 
   const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   const linkBtns = linksList
-    .map(l => `<a class="post-link" href="${l.url}" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="width:14px;height:14px;"><path d="M8 5v14l11-7Z"/></svg> ${escapeHtml(l.label)}</a>`)
+    .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${l.url}" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="width:14px;height:14px;"><path d="M8 5v14l11-7Z"/></svg> ${escapeHtml(l.label)}</a>`)
     .join("");
 
   const caption = data.caption
@@ -365,6 +365,20 @@ function renderPost(docSnap) {
     ${linkBtns}
     <button class="post-share" onclick="sharePost('${shareUrl}')"><svg class="icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg> Bagikan Konten</button>
   `;
+
+  // Hitung setiap klik tombol link (video/konten) -- dikirim ke Firestore
+  // sebagai field "linkClicks" di post ini, TANPA menahan navigasi (link tetap
+  // target="_blank" dan langsung terbuka; hitungannya jalan di belakang
+  // layar). Ini beda dari "postViews" (jumlah post/gambarnya DIBUKA/DILIHAT,
+  // lihat renderMain di bawah) -- keduanya muncul terpisah di dasbor admin.
+  post.querySelectorAll(".post-link[data-link-idx]").forEach((linkEl) => {
+    linkEl.addEventListener("click", () => {
+      updateDoc(doc(db, "posts", docSnap.id), { linkClicks: increment(1) }).catch((err) => {
+        console.error("Gagal mencatat klik link:", err);
+      });
+    });
+  });
+
   return post;
 }
 
@@ -379,6 +393,13 @@ if (postId) {
     }
     postsEl.innerHTML = "";
     postsEl.appendChild(renderPost(docSnap));
+
+    // Post ini dibuka lewat link-nya sendiri (/p/kode atau ?post=id) --
+    // dihitung sebagai satu "view" (post/gambarnya benar-benar dilihat),
+    // beda dari "linkClicks" (klik tombol link video di dalam post).
+    updateDoc(doc(db, "posts", postId), { postViews: increment(1) }).catch((err) => {
+      console.error("Gagal mencatat view post:", err);
+    });
 
     // Bar konten lainnya, live update, di bawah post yang dibagikan
     const otherWrap = document.createElement("div");
