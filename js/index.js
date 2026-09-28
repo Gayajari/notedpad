@@ -1,4 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { imgSrc, imgAttrs } from "/js/img.js";
 import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs, getCountFromServer, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
@@ -177,7 +178,7 @@ function loadCategoryBar() {
     let html = `<a class="category-chip${!tagParam ? " active" : ""}" href="${window.location.origin}/">Semua</a>`;
     allTags.forEach((t) => {
       const isActive = tagParam === t;
-      html += `<a class="category-chip${isActive ? " active" : ""}" href="?tag=${encodeURIComponent(t)}">#${escapeHtml(t)}</a>`;
+      html += `<a class="category-chip${isActive ? " active" : ""}" href="?tag=${encodeURIComponent(t)}">${escapeHtml(t.replace(/^#+/, ""))}</a>`;
     });
     bar.innerHTML = html;
   });
@@ -313,7 +314,7 @@ function renderSuggestions(qText) {
 
   let html = "";
   Array.from(matchedTags).slice(0, 5).forEach((t) => {
-    html += `<a class="search-suggestion-item" href="?tag=${encodeURIComponent(t)}"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4A2 2 0 0 1 2 11V4a2 2 0 0 1 2-2h7a2 2 0 0 1 1.41.59l8.18 8.18a2 2 0 0 1 0 2.83Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg> <span class="tag-label">#${escapeHtml(t)}</span></a>`;
+    html += `<a class="search-suggestion-item" href="?tag=${encodeURIComponent(t)}"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4A2 2 0 0 1 2 11V4a2 2 0 0 1 2-2h7a2 2 0 0 1 1.41.59l8.18 8.18a2 2 0 0 1 0 2.83Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg> <span class="tag-label">${escapeHtml(t.replace(/^#+/, ""))}</span></a>`;
   });
   matchedPosts.slice(0, 5).forEach((p) => {
     const href = p.code ? `/p/${p.code}` : `?post=${p.id}`;
@@ -378,7 +379,7 @@ function renderPost(docSnap) {
 
   const photoUrls = data.photoUrls || [];
   const photos = photoUrls
-    .map(url => `<img src="${url}" onclick="openLightbox('${url}')">`)
+    .map(url => `<img ${imgAttrs(url)} onclick="openLightbox('${imgSrc(url)}')">`)
     .join("");
   const photosClass = photoUrls.length > 1 ? "post-photos multi" : "post-photos single";
 
@@ -393,7 +394,7 @@ function renderPost(docSnap) {
 
   const tagsList = data.tags || [];
   const tagsHtml = tagsList.length
-    ? `<div class="post-tags">${tagsList.map(t => `<a class="tag-chip" href="?tag=${encodeURIComponent(t)}">#${escapeHtml(t)}</a>`).join("")}</div>`
+    ? `<div class="post-tags">${tagsList.map(t => `<a class="tag-chip" href="?tag=${encodeURIComponent(t)}">${escapeHtml(t.replace(/^#+/, ""))}</a>`).join("")}</div>`
     : "";
 
   const shareUrl = data.code

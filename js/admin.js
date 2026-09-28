@@ -1,4 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { imgAttrs } from "/js/img.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, query, where, limit, getDocs, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -464,7 +465,7 @@ function getLinksFromForm() {
 function getTagsFromForm() {
   const raw = document.getElementById("tags").value.trim();
   if (!raw) return [];
-  return raw.split(",").map(t => t.trim()).filter(Boolean);
+  return raw.split(",").map(t => t.trim().replace(/^#+/, "").trim()).filter(Boolean);
 }
 
 function escapeAttr(str) {
@@ -650,7 +651,7 @@ function renderExistingPreview() {
     const wrap = document.createElement("div");
     wrap.className = "preview-item";
     wrap.innerHTML = `
-      <img src="${url}" title="Foto lama">
+      <img ${imgAttrs(url)} title="Foto lama">
       <button type="button" class="editCropBtn" title="Ganti foto ini"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg></button>
       <button type="button" class="removeBtn" title="Hapus foto"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     `;
@@ -827,7 +828,7 @@ function applyAdminSearch() {
       : "";
 
     const thumbs = (data.photoUrls || [])
-      .map(url => `<img src="${url}">`)
+      .map(url => `<img ${imgAttrs(url)}>`)
       .join("");
 
     const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
