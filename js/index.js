@@ -103,8 +103,57 @@ function createAdsSlot(zone, showLabel) {
 document.getElementById("headerAdsSlot").appendChild(buildAdsIframe(ADS_ZONE_LEADERBOARD));
 
 loadContactBar();
+loadCustomChipBar();
 loadCategoryBar();
 setupSearch();
+
+/* ================== SLOT LINK FLEKSIBEL (3 slot, diisi dari dasbor) ==================
+   Data di Firestore: settings/chipbar -> chip{1..3}Name / chip{1..3}Link /
+   chip{1..3}Active. Tampil sebagai deret tab kecil di bawah tombol link setiap
+   post. Setiap post punya "slot" kosong (.post-chip-slot) yang diisi belakangan,
+   jadi tetap muncul walau datanya baru selesai dimuat setelah post dirender. */
+let postChipBarHtml = "";
+
+const playIconSvg = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" style="flex-shrink:0;"><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.18"/><path d="M10 8.3v7.4c0 .6.65 1 1.2.68l6.1-3.7c.55-.33.55-1.1 0-1.44l-6.1-3.7c-.55-.34-1.2.06-1.2.66z" fill="currentColor"/></svg>`;
+
+function escapeHtmlAttr(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+// Hanya link http/https yang boleh jadi tab (menolak javascript: dsb).
+function safeHttpUrl(url) {
+  try {
+    const u = new URL(String(url).trim());
+    return (u.protocol === "http:" || u.protocol === "https:") ? u.href : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function fillChipSlots(root = document) {
+  root.querySelectorAll(".post-chip-slot").forEach((el) => { el.innerHTML = postChipBarHtml; });
+}
+
+async function loadCustomChipBar() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "chipbar"));
+    if (!snap.exists()) return;
+    const data = snap.data();
+    let html = "";
+    [1, 2, 3].forEach((n) => {
+      const name = data[`chip${n}Name`];
+      const href = safeHttpUrl(data[`chip${n}Link`]);
+      const active = data[`chip${n}Active`] !== false;
+      if (active && name && href) {
+        html += `<a href="${escapeHtmlAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
+      }
+    });
+    postChipBarHtml = html ? `<div class="post-chip-bar">${html}</div>` : "";
+    fillChipSlots();
+  } catch (err) {
+    console.error("Gagal memuat slot link fleksibel:", err);
+  }
+}
 
 async function loadContactBar() {
   try {
@@ -385,7 +434,7 @@ function renderPost(docSnap) {
 
   const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   const linkBtns = linksList
-    .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${l.url}" target="_blank" rel="noopener noreferrer"><svg class="icon-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="width:14px;height:14px;"><path d="M8 5v14l11-7Z"/></svg> ${escapeHtml(l.label)}</a>`)
+    .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${escapeHtmlAttr(l.url)}" target="_blank" rel="noopener noreferrer">${playIconSvg} ${escapeHtml(l.label)}</a>`)
     .join("");
 
   const caption = data.caption
@@ -409,8 +458,11 @@ function renderPost(docSnap) {
     ${tagsHtml}
     <div class="${photosClass}">${photos}</div>
     ${linkBtns}
+    <div class="post-chip-slot"></div>
     <button class="post-share" onclick="sharePost('${shareUrl}')"><svg class="icon-sm" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg> Bagikan Konten</button>
   `;
+
+  fillChipSlots(post);
 
   // Hitung setiap klik tombol link (video/konten) -- dikirim ke Firestore
   // sebagai field "linkClicks" di post ini, TANPA menahan navigasi (link tetap

@@ -107,6 +107,7 @@ const loginCard = document.getElementById("loginCard");
 const formCard = document.getElementById("formCard");
 const listCard = document.getElementById("listCard");
 const contactCard = document.getElementById("contactCard");
+const chipBarCard = document.getElementById("chipBarCard");
 const loginMsg = document.getElementById("loginMsg");
 const formMsg = document.getElementById("formMsg");
 const formTitle = document.getElementById("formTitleText");
@@ -126,13 +127,16 @@ onAuthStateChanged(auth, (user) => {
     formCard.style.display = "block";
     listCard.style.display = "block";
     contactCard.style.display = "block";
+    chipBarCard.style.display = "block";
     loadContactSettings();
+    loadChipBarSettings();
     listenPosts();
   } else {
     loginCard.style.display = "block";
     formCard.style.display = "none";
     listCard.style.display = "none";
     contactCard.style.display = "none";
+    chipBarCard.style.display = "none";
   }
 });
 
@@ -150,6 +154,7 @@ function setupAccordion(toggleId, bodyId, arrowIcon) {
   });
 }
 setupAccordion("contactToggle", "contactBody");
+setupAccordion("chipBarToggle", "chipBarBody");
 
 document.getElementById("loginBtn").onclick = async () => {
   loginMsg.textContent = "";
@@ -872,6 +877,58 @@ function applyAdminSearch() {
     listEl.appendChild(item);
   });
 }
+
+/* ================== SLOT LINK FLEKSIBEL (3 slot) ==================
+   Disimpan di settings/chipbar: chip{1..3}Name, chip{1..3}Link, chip{1..3}Active.
+   Ditampilkan di homepage sebagai tab kecil di bawah tombol link tiap post. */
+async function loadChipBarSettings() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "chipbar"));
+    if (!snap.exists()) return;
+    const data = snap.data();
+    [1, 2, 3].forEach((n) => {
+      document.getElementById(`chip${n}Name`).value = data[`chip${n}Name`] || "";
+      document.getElementById(`chip${n}Link`).value = data[`chip${n}Link`] || "";
+      document.getElementById(`chip${n}Active`).checked = data[`chip${n}Active`] !== false;
+    });
+  } catch (err) {
+    console.error("Gagal memuat slot link fleksibel:", err);
+  }
+}
+
+document.getElementById("saveChipBarBtn").onclick = async () => {
+  const msgEl = document.getElementById("chipBarMsg");
+  msgEl.className = "msg";
+
+  const payload = {};
+  for (const n of [1, 2, 3]) {
+    const name = document.getElementById(`chip${n}Name`).value.trim();
+    const link = document.getElementById(`chip${n}Link`).value.trim();
+    if ((name && !link) || (!name && link)) {
+      msgEl.className = "msg error";
+      msgEl.textContent = `Slot ${n}: nama tab dan link harus diisi dua-duanya (atau kosongkan keduanya).`;
+      return;
+    }
+    if (link && !/^https?:\/\//i.test(link)) {
+      msgEl.className = "msg error";
+      msgEl.textContent = `Slot ${n}: link harus diawali http:// atau https://`;
+      return;
+    }
+    payload[`chip${n}Name`] = name || null;
+    payload[`chip${n}Link`] = link || null;
+    payload[`chip${n}Active`] = document.getElementById(`chip${n}Active`).checked;
+  }
+
+  msgEl.textContent = "Menyimpan...";
+  try {
+    await setDoc(doc(db, "settings", "chipbar"), payload);
+    msgEl.className = "msg success";
+    msgEl.textContent = "Slot link berhasil disimpan!";
+  } catch (err) {
+    msgEl.className = "msg error";
+    msgEl.textContent = "Gagal: " + err.message;
+  }
+};
 
 async function loadContactSettings() {
   try {
