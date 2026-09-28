@@ -82,32 +82,66 @@
     break-inside: avoid;
     background: rgba(0,0,0,0.04);
   }
+  /* Tab link (video/konten): ukuran, jarak, dan bentuk mengikuti Vipku --
+     pil penuh, lebar penuh dikurangi margin 14px kiri-kanan, padding 11px. */
   .post-link {
-    display: block;
-    margin: 0 15px 15px 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: calc(100% - 28px);
+    margin: 0 14px 14px 14px;
     background: #2b3a67;
-    color: white;
+    color: #fff;
     text-align: center;
-    padding: 10px;
-    border-radius: 8px;
+    padding: 11px;
+    border-radius: 999px;
     text-decoration: none;
     font-weight: 600;
+    font-size: 14px;
+    transition: background 0.2s ease;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
   }
+  .post-link:active { background: #1f2c50; }
+
+  /* Tab bagikan: kecil, di tengah, pil (ukuran & jarak sama dengan Vipku). */
   .post-share {
-    display: block;
-    width: calc(100% - 30px);
-    margin: 0 15px 15px 15px;
-    background: white;
+    display: table;
+    margin: 0 auto 14px auto;
+    background: transparent;
     color: #2b3a67;
     text-align: center;
-    padding: 10px;
-    border-radius: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
     border: 1.5px solid #2b3a67;
-    font-weight: 600;
-    font-size: 14px;
+    font-weight: 500;
+    font-size: 12px;
+    font-family: inherit;
     cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
   }
   .post-share:active { background: #eef1fb; }
+
+  /* Slot link fleksibel (diisi dari dasbor): deret tab kecil di bawah tombol link. */
+  .post-chip-bar {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 14px 10px 14px;
+  }
+  .post-chip-bar a {
+    text-decoration: none;
+    background: #197278;
+    color: #fff;
+    padding: 6px 13px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .post-chip-bar a:active { background: #145b60; }
 
   .post-tags {
     display: flex;
