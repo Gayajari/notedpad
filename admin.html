@@ -36,6 +36,43 @@
   </div>
 </div>
 
+<div class="card" id="chipBarCard" style="display:none;">
+  <button type="button" class="accordion-toggle" id="chipBarToggle">
+    <span class="accordion-label"><svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4A2 2 0 0 1 2 11V4a2 2 0 0 1 2-2h7a2 2 0 0 1 1.41.59l8.18 8.18a2 2 0 0 1 0 2.83Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>Slot Link Fleksibel (3 Slot)</span>
+    <svg class="icon accordion-arrow" id="chipBarArrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+  <div class="accordion-body" id="chipBarBody">
+    <p style="font-size:12px; color:#888; margin:0 0 12px;">Tab link kecil yang muncul di setiap post, tepat di bawah tombol link. Kosongkan nama &amp; link kalau slot tidak dipakai. Tab hanya tampil kalau nama + link terisi dan statusnya Aktif.</p>
+
+    <label>Slot 1 — Nama Tab</label>
+    <input type="text" id="chip1Name" placeholder="misal: Grup Bonus">
+    <label>Slot 1 — Link</label>
+    <input type="url" id="chip1Link" placeholder="https://...">
+    <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:500;">
+      <input type="checkbox" id="chip1Active" style="width:auto;" checked> Aktif
+    </label>
+
+    <label style="margin-top:16px;">Slot 2 — Nama Tab</label>
+    <input type="text" id="chip2Name" placeholder="misal: Promo Terbaru">
+    <label>Slot 2 — Link</label>
+    <input type="url" id="chip2Link" placeholder="https://...">
+    <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:500;">
+      <input type="checkbox" id="chip2Active" style="width:auto;" checked> Aktif
+    </label>
+
+    <label style="margin-top:16px;">Slot 3 — Nama Tab</label>
+    <input type="text" id="chip3Name" placeholder="misal: Channel Utama">
+    <label>Slot 3 — Link</label>
+    <input type="url" id="chip3Link" placeholder="https://...">
+    <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:500;">
+      <input type="checkbox" id="chip3Active" style="width:auto;" checked> Aktif
+    </label>
+
+    <button id="saveChipBarBtn" style="margin-top:16px;">Simpan Slot Link</button>
+    <div class="msg" id="chipBarMsg"></div>
+  </div>
+</div>
+
 <div class="card" id="formCard" style="display:none;">
   <h2><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span id="formTitleText">Tambah Konten Baru</span></h2>
 
