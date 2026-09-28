@@ -1,6 +1,53 @@
 {
   "rewrites": [
-    { "source": "/p/:code", "destination": "/index.html" },
-    { "source": "/dasbor", "destination": "/admin.html" }
+    {
+      "source": "/p/:code",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dasbor",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/img/:path*",
+      "destination": "https://pub-58da72c0c5454f059f25e24b5391aa2a.r2.dev/:path*"
+    },
+    {
+      "source": "/ibb/:path*",
+      "destination": "https://i.ibb.co/:path*"
+    },
+    {
+      "source": "/ibbcom/:path*",
+      "destination": "https://i.ibb.co.com/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/img/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/ibb/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/ibbcom/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    }
   ]
 }
