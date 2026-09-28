@@ -325,3 +325,12 @@
     border: none;
     display: block;
   }
+
+/* Jumlah total konten di database (di atas daftar post) */
+.feed-meta {
+  margin-top: 14px;
+  margin-bottom: -6px;
+  font-size: 12px;
+  color: #888;
+}
+.feed-meta b { color: #2b3a67; }

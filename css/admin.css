@@ -479,3 +479,14 @@ iframe{
     font-size:36px;
   }
 }
+
+/* Badge jumlah total postingan di judul "Konten Tersimpan" */
+.count-badge {
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #eef1fb;
+  color: #2b3a67;
+  font-size: 13px;
+  font-weight: 700;
+}
