@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs, getCountFromServer, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -48,6 +48,9 @@ async function resolvePostId() {
 }
 
 let allDocsCache = [];
+const ALL_DOCS_LIMIT = 200;
+let totalPostsCount = null; // jumlah SEMUA post di database (bukan cuma yang tampil)
+let totalCountSeq = 0;
 let searchActive = false;
 const MAIN_FEED_LIMIT = 50;
 
@@ -124,11 +127,43 @@ async function loadContactBar() {
   }
 }
 
+// Total post di database. Selama jumlahnya di bawah batas listener (200),
+// cukup pakai ukuran snapshot (realtime, langsung berkurang saat ada yang
+// dihapus). Kalau sudah menyentuh batas, hitung ke server supaya angkanya
+// tetap akurat dan tidak mentok di 200.
+async function refreshTotalCount(snapshot) {
+  const seq = ++totalCountSeq;
+  let count = snapshot.size;
+  if (snapshot.size >= ALL_DOCS_LIMIT) {
+    try {
+      const agg = await getCountFromServer(collection(db, "posts"));
+      count = agg.data().count;
+    } catch (err) {
+      console.error("Gagal menghitung total post:", err);
+    }
+  }
+  if (seq !== totalCountSeq) return; // ada pembaruan yang lebih baru
+  totalPostsCount = count;
+  renderFeedMeta();
+}
+
+function renderFeedMeta() {
+  const el = document.getElementById("feedMeta");
+  if (!el) return;
+  if (shortCode || postIdParam || tagParam || searchActive || totalPostsCount === null) {
+    el.style.display = "none";
+    return;
+  }
+  el.style.display = "";
+  el.innerHTML = `<svg class="icon-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> <b>${totalPostsCount}</b> konten`;
+}
+
 function loadCategoryBar() {
   const bar = document.getElementById("categoryBar");
-  const qAll = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(200));
+  const qAll = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(ALL_DOCS_LIMIT));
   onSnapshot(qAll, (snapshot) => {
     allDocsCache = snapshot.docs;
+    refreshTotalCount(snapshot);
     renderOldPostsRotation();
 
     const allTags = new Set();
@@ -153,7 +188,7 @@ function renderOldPostsRotation() {
   if (!wrap) return;
 
   // Rotasi cuma tampil di halaman utama, bukan di mode post/tag
-  if (postId || tagParam) {
+  if (shortCode || postIdParam || tagParam) {
     wrap.innerHTML = "";
     return;
   }
@@ -172,8 +207,17 @@ function renderOldPostsRotation() {
     saved = null;
   }
 
+  // Rotasi harian yang tersimpan hanya dipakai kalau SEMUA post di dalamnya
+  // masih ada di database (belum dihapus / belum bergeser ke feed utama).
+  // Kalau ada yang sudah hilang, diacak ulang supaya tampilan selalu sinkron.
+  const wantedCount = Math.min(3, pool.length);
+  const savedStillValid =
+    saved && saved.date === today && Array.isArray(saved.ids) &&
+    saved.ids.length === wantedCount &&
+    saved.ids.every((id) => pool.some((d) => d.id === id));
+
   let chosenIds;
-  if (saved && saved.date === today && Array.isArray(saved.ids) && saved.ids.length > 0) {
+  if (savedStillValid) {
     chosenIds = saved.ids;
   } else {
     const shuffled = [...pool].sort(() => Math.random() - 0.5);
@@ -296,6 +340,7 @@ function runFullSearch(qTextRaw) {
   }
 
   searchActive = true;
+  renderFeedMeta();
   const filtered = allDocsCache.filter((docSnap) => {
     const data = docSnap.data();
     const tags = data.tags || [];
@@ -307,7 +352,7 @@ function runFullSearch(qTextRaw) {
   postsEl.innerHTML = "";
   const header = document.createElement("div");
   header.className = "section-title";
-  header.textContent = "Hasil Pencarian";
+  header.textContent = `Hasil Pencarian · ${filtered.length} konten`;
   postsEl.appendChild(header);
 
   if (filtered.length === 0) {
@@ -441,7 +486,7 @@ if (postId) {
     postsEl.innerHTML = "";
     const header = document.createElement("div");
     header.className = "section-title";
-    header.textContent = `Tag: ${tagParam}`;
+    header.textContent = `Tag: ${tagParam} · ${snapshot.size} konten`;
     postsEl.appendChild(header);
 
     if (snapshot.empty) {

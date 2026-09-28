@@ -25,9 +25,13 @@ const eyeIconSvgSmall = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertica
 // meneruskan file ke Cloudflare R2. Lihat api/upload.js.
 async function uploadToCloudflare(file) {
   const dataBase64 = await fileToBase64(file);
+  const idToken = await auth.currentUser.getIdToken();
   const res = await fetch("/api/upload", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}`
+    },
     body: JSON.stringify({
       filename: file.name,
       contentType: file.type,
@@ -50,25 +54,32 @@ function fileToBase64(file) {
   });
 }
 
-// Hapus file dari Cloudflare R2 lewat /api/delete. Best-effort: dipanggil
-// tanpa menghalangi alur utama (simpan/hapus post di Firestore tetap jalan
-// walau ini gagal) -- tapi tetap diusahakan supaya file R2 tidak menumpuk
-// jadi sampah setiap kali foto/post dihapus dari admin.
+// Hapus file dari Cloudflare R2 lewat /api/delete. Tidak pernah melempar
+// error (alur simpan/hapus post di Firestore tetap jalan walau ini gagal),
+// tapi MENGEMBALIKAN true/false supaya pemanggil bisa memberi tahu admin
+// kalau ada file yang gagal dihapus -- jadi tidak gagal diam-diam.
 async function deleteFromCloudflare(urls) {
   const list = (urls || []).filter(Boolean);
-  if (list.length === 0) return;
+  if (list.length === 0) return true;
   try {
+    const idToken = await auth.currentUser.getIdToken();
     const res = await fetch("/api/delete", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      },
       body: JSON.stringify({ urls: list })
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      console.error("Gagal menghapus foto lama dari Cloudflare R2:", data.error || res.status);
+      console.error("Gagal menghapus foto dari Cloudflare R2:", data.error || res.status);
+      return false;
     }
+    return true;
   } catch (err) {
-    console.error("Gagal menghapus foto lama dari Cloudflare R2:", err);
+    console.error("Gagal menghapus foto dari Cloudflare R2:", err);
+    return false;
   }
 }
 
@@ -502,6 +513,12 @@ submitBtn.onclick = async () => {
   submitBtn.disabled = true;
   formMsg.textContent = "Memproses...";
 
+  // Foto yang baru diupload pada percobaan ini + penanda apakah datanya sudah
+  // masuk Firestore. Kalau proses gagal SEBELUM tersimpan, foto-foto itu jadi
+  // file yatim di R2 (tidak ada post yang memakainya) -> dibersihkan di catch.
+  const uploadedNow = [];
+  let dbSaved = false;
+
   try {
     const photoUrls = [...editingExistingPhotos];
     let i = 0;
@@ -510,6 +527,7 @@ submitBtn.onclick = async () => {
       formMsg.textContent = `Mengunggah foto ${i} dari ${selectedFiles.length}...`;
       const url = await uploadToCloudflare(file);
       photoUrls.push(url);
+      uploadedNow.push(url);
     }
 
     formMsg.textContent = "Menyimpan data...";
@@ -526,6 +544,7 @@ submitBtn.onclick = async () => {
         caption: caption || null,
         code: editingCode
       });
+      dbSaved = true;
       formMsg.className = "msg success";
       formMsg.textContent = "Materi berhasil diperbarui!";
 
@@ -534,7 +553,12 @@ submitBtn.onclick = async () => {
       // berhasil tersimpan (bukan saat tombol ✕ diklik), supaya kalau admin
       // batal edit, foto lama tidak ikut kehapus sia-sia.
       if (removedExistingPhotos.length > 0) {
-        deleteFromCloudflare(removedExistingPhotos);
+        deleteFromCloudflare(removedExistingPhotos).then((cleaned) => {
+          if (!cleaned) {
+            formMsg.className = "msg error";
+            formMsg.textContent = "Materi tersimpan, tapi sebagian foto lama gagal dihapus dari Cloudflare R2 (file masih ada di bucket).";
+          }
+        });
         removedExistingPhotos = [];
       }
 
@@ -556,6 +580,7 @@ submitBtn.onclick = async () => {
         code,
         createdAt: serverTimestamp()
       });
+      dbSaved = true;
       formMsg.className = "msg success";
       formMsg.textContent = "Berhasil dibagikan konten!";
 
@@ -570,6 +595,9 @@ submitBtn.onclick = async () => {
     formMsg.className = "msg error";
     formMsg.textContent = "Gagal: " + err.message;
     console.error(err);
+    if (!dbSaved && uploadedNow.length > 0) {
+      deleteFromCloudflare(uploadedNow);
+    }
   } finally {
     submitBtn.disabled = false;
   }
@@ -668,7 +696,10 @@ async function removePost(id, photoUrls) {
     // semua foto post ini dari Cloudflare R2 supaya tidak jadi file yatim
     // yang menumpuk (tetap memakan kuota storage walau tidak terpakai lagi).
     if (photoUrls && photoUrls.length > 0) {
-      deleteFromCloudflare(photoUrls);
+      const cleaned = await deleteFromCloudflare(photoUrls);
+      if (!cleaned) {
+        alert("Post sudah terhapus dari database, tetapi sebagian file foto gagal dihapus dari Cloudflare R2 (file masih tersimpan di bucket). Cek koneksi/login lalu hapus manual dari dashboard Cloudflare bila perlu.");
+      }
     }
   } catch (err) {
     alert("Gagal menghapus: " + err.message);
@@ -755,6 +786,9 @@ document.getElementById("adminSearchClear").addEventListener("click", () => {
 });
 
 function applyAdminSearch() {
+  // Total = jumlah dokumen di Firestore saat ini (listener dasbor tanpa limit),
+  // jadi otomatis berkurang begitu ada post yang dihapus.
+  document.getElementById("totalPostCount").textContent = allPostsCache.length;
   const listEl = document.getElementById("postList");
   const countEl = document.getElementById("adminSearchCount");
   const clearBtn = document.getElementById("adminSearchClear");
