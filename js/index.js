@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { imgSrc, imgAttrs } from "/js/img.js";
-import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs, getCountFromServer, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, getDocs, getCountFromServer, updateDoc, increment, setDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDHC1apydBUTxsz3ZhJUhw4ukNIb9WD90E",
   authDomain: "notepad-d9f0b.firebaseapp.com",
@@ -155,6 +155,29 @@ async function loadCustomChipBar() {
   }
 }
 
+/* ================== INDEKS TAG LENGKAP (settings/tagIndex) ==================
+   Bar tag & saran pencarian SEBELUMNYA cuma mengambil tag dari 200 post
+   terbaru (allDocsCache) -- tag yang cuma dipakai di post lama/jarang tidak
+   pernah muncul. Tag itu detail yang harus lengkap menyeluruh berapa pun
+   kecil pemakaiannya, jadi sekarang dibaca dari satu dokumen ringkas yang
+   menyimpan SEMUA tag yang pernah dipakai (ditambahkan otomatis dari admin.js
+   setiap kali post baru/diedit menyertakan tag baru). Dokumen ini hanya
+   BERTAMBAH isinya -- tag yang sudah tidak dipakai post mana pun tetap
+   tercatat di sini (tetap aman diklik, cuma akan menampilkan "belum ada
+   konten dengan tag ini" kalau memang sudah tidak ada post yang memakainya). */
+let allTagsCache = [];
+
+async function loadAllTagsIndex() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "tagIndex"));
+    allTagsCache = snap.exists() ? (snap.data().allTags || []) : [];
+  } catch (err) {
+    console.error("Gagal memuat indeks tag:", err);
+    allTagsCache = [];
+  }
+  renderCategoryBar();
+}
+
 async function loadContactBar() {
   try {
     const snap = await getDoc(doc(db, "settings", "contact"));
@@ -209,28 +232,27 @@ function renderFeedMeta() {
 }
 
 function loadCategoryBar() {
-  const bar = document.getElementById("categoryBar");
   const qAll = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(ALL_DOCS_LIMIT));
   onSnapshot(qAll, (snapshot) => {
     allDocsCache = snapshot.docs;
     refreshTotalCount(snapshot);
     renderOldPostsRotation();
-
-    const allTags = new Set();
-    snapshot.forEach((docSnap) => {
-      (docSnap.data().tags || []).forEach((t) => allTags.add(t));
-    });
-    if (allTags.size === 0) {
-      bar.innerHTML = "";
-      return;
-    }
-    let html = `<a class="category-chip${!tagParam ? " active" : ""}" href="${window.location.origin}/">Semua</a>`;
-    allTags.forEach((t) => {
-      const isActive = tagParam === t;
-      html += `<a class="category-chip${isActive ? " active" : ""}" href="?tag=${encodeURIComponent(t)}">${escapeHtml(t.replace(/^#+/, ""))}</a>`;
-    });
-    bar.innerHTML = html;
   });
+  loadAllTagsIndex();
+}
+
+function renderCategoryBar() {
+  const bar = document.getElementById("categoryBar");
+  if (allTagsCache.length === 0) {
+    bar.innerHTML = "";
+    return;
+  }
+  let html = `<a class="category-chip${!tagParam ? " active" : ""}" href="${window.location.origin}/">Semua</a>`;
+  allTagsCache.forEach((t) => {
+    const isActive = tagParam === t;
+    html += `<a class="category-chip${isActive ? " active" : ""}" href="?tag=${encodeURIComponent(t)}">${escapeHtml(t.replace(/^#+/, ""))}</a>`;
+  });
+  bar.innerHTML = html;
 }
 
 function renderOldPostsRotation() {
@@ -348,14 +370,13 @@ function setupSearch() {
 
 function renderSuggestions(qText) {
   const suggestBox = document.getElementById("searchSuggestions");
-  const matchedTags = new Set();
+  // Tag: dicocokkan dari indeks LENGKAP (allTagsCache), bukan cuma post yang
+  // kebetulan ke-cache -- sekecil apa pun pemakaiannya, tetap ketemu di sini.
+  const matchedTags = allTagsCache.filter((t) => t.toLowerCase().includes(qText));
   const matchedPosts = [];
 
   allDocsCache.forEach((docSnap) => {
     const data = docSnap.data();
-    (data.tags || []).forEach((t) => {
-      if (t.toLowerCase().includes(qText)) matchedTags.add(t);
-    });
     if (data.caption && data.caption.toLowerCase().includes(qText)) {
       matchedPosts.push({ id: docSnap.id, caption: data.caption, code: data.code });
     }
