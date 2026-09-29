@@ -11,22 +11,25 @@
 <body>
 
 <header>
-  <h1>Serba Nikmat</h1>
-  <p>Konten update tiap hari</p>
+  <a href="/" class="logo-home-link" aria-label="Kembali ke Beranda"><h1>Serba Nikmat</h1></a>
+  <div class="header-row">
+    <a href="/" class="home-icon-btn" aria-label="Kembali ke Beranda">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+    </a>
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <button type="button" id="searchBtn" aria-label="Cari"><svg class="icon-sm" viewBox="0 0 24 24" style="width:14px;height:14px;"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></svg></button>
+        <input type="text" id="searchInput" placeholder="Pencarian...">
+        <button type="button" id="clearBtn" aria-label="Hapus teks"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="search-suggestions" id="searchSuggestions"></div>
+    </div>
+  </div>
 </header>
 
 <div class="ads-banner" id="headerAdsSlot"></div>
 
 <div class="contact-bar" id="contactBar"></div>
-
-<div class="search-bar">
-  <div class="search-input-wrap">
-    <button type="button" id="searchBtn" aria-label="Cari"><svg class="icon-sm" viewBox="0 0 24 24" style="width:14px;height:14px;"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></svg></button>
-    <input type="text" id="searchInput" placeholder="Pencarian...">
-    <button type="button" id="clearBtn" aria-label="Hapus teks"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-  </div>
-  <div class="search-suggestions" id="searchSuggestions"></div>
-</div>
 
 <div class="category-bar" id="categoryBar"></div>
 
