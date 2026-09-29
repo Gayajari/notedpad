@@ -7,13 +7,56 @@
     color: #222;
   }
   header {
-    background: #2b3a67;
-    color: white;
-    padding: 20px;
-    text-align: center;
+    background: #fff8f0;
+    color: #2b3a67;
+    padding: 16px 15px 10px;
+    text-align: left;
+    border-bottom: 1px solid #e3e5ec;
   }
-  header h1 { margin: 0; font-size: 22px; }
-  header p { margin: 5px 0 0; font-size: 13px; opacity: 0.85; }
+  /* "Serba Nikmat" juga berfungsi sebagai tombol kembali ke beranda --
+     ukuran & jarak mengikuti pola situs acuan (Vipku): judul kecil, rapat,
+     tanpa sub-judul di bawahnya. */
+  .logo-home-link {
+    color: inherit;
+    text-decoration: none;
+    display: block;
+    transition: opacity 0.2s ease;
+  }
+  .logo-home-link:active { opacity: 0.65; }
+  header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+  }
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .header-row .search-bar {
+    flex: 1;
+    padding: 0;
+    min-width: 0;
+  }
+  /* Tombol bulat kecil di sebelah kolom pencarian, jalan pintas kedua untuk
+     kembali ke beranda (lepas dari tag/pencarian/halaman post yang aktif). */
+  .home-icon-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1.5px solid #e3e5ec;
+    color: #2b3a67;
+    text-decoration: none;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+  }
+  .home-icon-btn:active { border-color: #2b3a67; background: #eef1fb; }
   .icon-sm {
     width: 13px;
     height: 13px;
@@ -160,19 +203,23 @@
   }
   .tag-chip:active { background: #dde3f7; }
 
+  /* Bar tag: ukuran & jarak antar chip mengikuti situs acuan (Vipku) --
+     padding lebih lega, gap antar chip 8px. Fungsinya menampilkan TAG
+     (penanda detail per-post), bukan kategori (pengelompokan besar/kaku) --
+     karena itu daftarnya bisa panjang dan discroll ke samping. */
   .category-bar {
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding: 14px 15px 4px 15px;
-    margin-top: 14px;
-    border-top: 1px solid #e3e5ec;
+    padding: 14px 15px 12px 15px;
+    margin-top: 0;
+    border-top: none;
     -webkit-overflow-scrolling: touch;
   }
   .category-bar::-webkit-scrollbar { display: none; }
 
   .search-bar {
-    padding: 10px 15px 0 15px;
+    padding: 0;
     position: relative;
   }
   .search-input-wrap {
@@ -256,18 +303,20 @@
   .category-chip {
     flex: 0 0 auto;
     text-decoration: none;
-    background: #2b3a67;
-    color: #fff;
+    background: #fff;
+    border: 1.5px solid #e3e5ec;
+    color: #2b3a67;
     padding: 6px 14px;
-    border-radius: 20px;
+    border-radius: 999px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
+    transition: all 0.2s ease;
   }
   .category-chip.active {
-    background: #eef1fb;
-    color: #2b3a67;
-    border: 1.5px solid #2b3a67;
+    background: #2b3a67;
+    color: #fff;
+    border-color: #2b3a67;
   }
   .empty {
     text-align: center;
