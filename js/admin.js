@@ -16,33 +16,21 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Ikon svg kecil pengganti emoji (dipakai lewat innerHTML di beberapa tempat)
 const shareIconSvg = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:4px;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>`;
 const linkIconSvgSmall = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:3px;"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>`;
 const tagIconSvgSmall = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:3px;"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4A2 2 0 0 1 2 11V4a2 2 0 0 1 2-2h7a2 2 0 0 1 1.41.59l8.18 8.18a2 2 0 0 1 0 2.83Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>`;
 const eyeIconSvgSmall = `<svg class="icon-sm" viewBox="0 0 24 24" style="vertical-align:-2px; margin-right:3px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>`;
 
-// Upload foto lewat serverless function /api/upload (Vercel), yang
-// meneruskan file ke Cloudflare R2. Lihat api/upload.js.
 async function uploadToCloudflare(file) {
   const dataBase64 = await fileToBase64(file);
   const idToken = await auth.currentUser.getIdToken();
   const res = await fetch("/api/upload", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${idToken}`
-    },
-    body: JSON.stringify({
-      filename: file.name,
-      contentType: file.type,
-      dataBase64
-    })
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
+    body: JSON.stringify({ filename: file.name, contentType: file.type, dataBase64 })
   });
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || "Upload ke Cloudflare gagal");
-  }
+  if (!res.ok) throw new Error(data.error || "Upload ke Cloudflare gagal");
   return data.url;
 }
 
@@ -55,10 +43,6 @@ function fileToBase64(file) {
   });
 }
 
-// Hapus file dari Cloudflare R2 lewat /api/delete. Tidak pernah melempar
-// error (alur simpan/hapus post di Firestore tetap jalan walau ini gagal),
-// tapi MENGEMBALIKAN true/false supaya pemanggil bisa memberi tahu admin
-// kalau ada file yang gagal dihapus -- jadi tidak gagal diam-diam.
 async function deleteFromCloudflare(urls) {
   const list = (urls || []).filter(Boolean);
   if (list.length === 0) return true;
@@ -66,10 +50,7 @@ async function deleteFromCloudflare(urls) {
     const idToken = await auth.currentUser.getIdToken();
     const res = await fetch("/api/delete", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`
-      },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
       body: JSON.stringify({ urls: list })
     });
     if (!res.ok) {
@@ -84,13 +65,10 @@ async function deleteFromCloudflare(urls) {
   }
 }
 
-// Kode pendek 6 karakter (huruf besar & kecil saja) untuk link domain/p/KODE
 const CODE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 function generateCode() {
   let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-  }
+  for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
   return code;
 }
 async function generateUniqueCode() {
@@ -120,7 +98,7 @@ let selectedFiles = [];
 let editingId = null;
 let editingExistingPhotos = [];
 let editingCode = null;
-let removedExistingPhotos = []; // foto lama yang dibuang selama sesi edit ini, baru benar-benar dihapus dari R2 saat Simpan Perubahan berhasil
+let removedExistingPhotos = [];
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
@@ -144,9 +122,6 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// Accordion pengaturan: disembunyikan dulu, baru muncul kalau bar-nya
-// diklik. Dipakai untuk semua bagian "pengaturan" di dasbor (saat ini baru
-// Link Sosmed, tapi pola ini scalable untuk pengaturan lain di masa depan).
 function setupAccordion(toggleId, bodyId) {
   const toggleBtn = document.getElementById(toggleId);
   const body = document.getElementById(bodyId);
@@ -174,12 +149,7 @@ document.getElementById("loginBtn").onclick = async () => {
 
 document.getElementById("logoutBtn").onclick = () => signOut(auth);
 
-/* ================== ENGINE CROPPING FOTO FLEKSIBEL ==================
-   Geser (drag/pointer) untuk atur posisi, slider untuk zoom, dan chip
-   rasio (Bebas/1:1/4:5/3:4/16:9/9:16). Output di-render ke <canvas> lalu
-   dikompres jadi JPEG sebelum diupload ke Cloudflare R2 lewat /api/upload,
-   supaya ukuran file ringan & framing-nya konsisten dengan tampilan di
-   index (post-photos: object-fit cover). */
+/* ================== CROP ENGINE ================== */
 const cropOverlay = document.getElementById("cropModalOverlay");
 const cropStage = document.getElementById("cropStage");
 const cropImgEl = document.getElementById("cropImg");
@@ -189,28 +159,19 @@ const cropCloseBtn = document.getElementById("cropCloseBtn");
 const cropConfirmBtn = document.getElementById("cropConfirmBtn");
 const cropSwapBtn = document.getElementById("cropSwapBtn");
 const cropSwapInput = document.getElementById("cropSwapInput");
-
 const CROP_STAGE_MAX_W = 360;
 
-let cropResolve = null;
-let cropObjectUrl = null;
-let cropNaturalW = 0, cropNaturalH = 0;
-let cropRatio = 0; // 0 = Bebas (ikut rasio asli foto)
-let cropBaseScale = 1;
-let cropScale = 1;
+let cropResolve = null, cropObjectUrl = null;
+let cropNaturalW = 0, cropNaturalH = 0, cropRatio = 0;
+let cropBaseScale = 1, cropScale = 1;
 let cropOffsetX = 0, cropOffsetY = 0;
-let cropDragging = false;
-let cropDragStartX = 0, cropDragStartY = 0;
+let cropDragging = false, cropDragStartX = 0, cropDragStartY = 0;
 let cropOffsetStartX = 0, cropOffsetStartY = 0;
 const cropActivePointers = new Map();
-let cropPinchStartDist = 0;
-let cropPinchStartScale = 1;
+let cropPinchStartDist = 0, cropPinchStartScale = 1;
 
 function openCropperForFile(file) {
-  return new Promise((resolve) => {
-    cropResolve = resolve;
-    loadFileIntoCropper(file);
-  });
+  return new Promise((resolve) => { cropResolve = resolve; loadFileIntoCropper(file); });
 }
 
 function loadFileIntoCropper(file) {
@@ -223,9 +184,6 @@ function loadFileIntoCropper(file) {
     cropAspectBar.querySelectorAll(".crop-aspect-chip").forEach((c) => c.classList.remove("active"));
     cropAspectBar.querySelector('[data-ratio="0"]').classList.add("active");
     cropRatio = 0;
-    // Modal harus sudah tampil (display:flex) DULU sebelum menghitung ukuran
-    // stage — kalau dihitung sewaktu modal masih display:none, clientWidth/
-    // Height selalu 0 dan hasil crop bisa jadi kosong.
     cropOverlay.classList.add("open");
     setupCropStageSize();
     resetCropTransform();
@@ -235,31 +193,26 @@ function loadFileIntoCropper(file) {
 function setupCropStageSize() {
   const stageW = Math.min(CROP_STAGE_MAX_W, window.innerWidth - 64);
   const ratio = cropRatio > 0 ? cropRatio : (cropNaturalW / cropNaturalH);
-  const stageH = stageW / ratio;
   cropStage.style.width = stageW + "px";
-  cropStage.style.height = stageH + "px";
+  cropStage.style.height = (stageW / ratio) + "px";
 }
 
 function resetCropTransform() {
-  let stageW = cropStage.clientWidth;
-  let stageH = cropStage.clientHeight;
+  let stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
   if (!stageW || !stageH) {
     stageW = CROP_STAGE_MAX_W;
     stageH = cropRatio > 0 ? stageW / cropRatio : stageW * (cropNaturalH / cropNaturalW);
   }
   cropBaseScale = Math.max(stageW / cropNaturalW, stageH / cropNaturalH);
   cropScale = cropBaseScale;
-  cropOffsetX = 0;
-  cropOffsetY = 0;
+  cropOffsetX = 0; cropOffsetY = 0;
   cropZoomRange.value = 100;
   applyCropTransform();
 }
 
 function clampCropOffsets() {
-  const stageW = cropStage.clientWidth;
-  const stageH = cropStage.clientHeight;
-  const dispW = cropNaturalW * cropScale;
-  const dispH = cropNaturalH * cropScale;
+  const stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
+  const dispW = cropNaturalW * cropScale, dispH = cropNaturalH * cropScale;
   const maxX = Math.max(0, (dispW - stageW) / 2);
   const maxY = Math.max(0, (dispH - stageH) / 2);
   cropOffsetX = Math.min(maxX, Math.max(-maxX, cropOffsetX));
@@ -268,10 +221,8 @@ function clampCropOffsets() {
 
 function applyCropTransform() {
   clampCropOffsets();
-  const stageW = cropStage.clientWidth;
-  const stageH = cropStage.clientHeight;
-  const dispW = cropNaturalW * cropScale;
-  const dispH = cropNaturalH * cropScale;
+  const stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
+  const dispW = cropNaturalW * cropScale, dispH = cropNaturalH * cropScale;
   cropImgEl.style.width = dispW + "px";
   cropImgEl.style.height = dispH + "px";
   cropImgEl.style.left = ((stageW - dispW) / 2 + cropOffsetX) + "px";
@@ -289,8 +240,7 @@ cropAspectBar.querySelectorAll(".crop-aspect-chip").forEach((btn) => {
 });
 
 cropZoomRange.addEventListener("input", () => {
-  const pct = Number(cropZoomRange.value) / 100;
-  cropScale = cropBaseScale * pct;
+  cropScale = cropBaseScale * (Number(cropZoomRange.value) / 100);
   applyCropTransform();
 });
 
@@ -298,12 +248,9 @@ function cropPointerDown(e) {
   cropActivePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   cropStage.setPointerCapture(e.pointerId);
   if (cropActivePointers.size === 1) {
-    cropDragging = true;
-    cropStage.classList.add("dragging");
-    cropDragStartX = e.clientX;
-    cropDragStartY = e.clientY;
-    cropOffsetStartX = cropOffsetX;
-    cropOffsetStartY = cropOffsetY;
+    cropDragging = true; cropStage.classList.add("dragging");
+    cropDragStartX = e.clientX; cropDragStartY = e.clientY;
+    cropOffsetStartX = cropOffsetX; cropOffsetStartY = cropOffsetY;
   } else if (cropActivePointers.size === 2) {
     cropDragging = false;
     const pts = Array.from(cropActivePointers.values());
@@ -314,14 +261,11 @@ function cropPointerDown(e) {
 function cropPointerMove(e) {
   if (!cropActivePointers.has(e.pointerId)) return;
   cropActivePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
   if (cropActivePointers.size === 2) {
     const pts = Array.from(cropActivePointers.values());
     const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     if (cropPinchStartDist > 0) {
-      const minScale = cropBaseScale;
-      const maxScale = cropBaseScale * 3;
-      cropScale = Math.min(maxScale, Math.max(minScale, cropPinchStartScale * (dist / cropPinchStartDist)));
+      cropScale = Math.min(cropBaseScale * 3, Math.max(cropBaseScale, cropPinchStartScale * (dist / cropPinchStartDist)));
       cropZoomRange.value = Math.round((cropScale / cropBaseScale) * 100);
       applyCropTransform();
     }
@@ -334,10 +278,7 @@ function cropPointerMove(e) {
 function cropPointerUp(e) {
   cropActivePointers.delete(e.pointerId);
   if (cropActivePointers.size < 2) cropPinchStartDist = 0;
-  if (cropActivePointers.size === 0) {
-    cropDragging = false;
-    cropStage.classList.remove("dragging");
-  }
+  if (cropActivePointers.size === 0) { cropDragging = false; cropStage.classList.remove("dragging"); }
 }
 cropStage.addEventListener("pointerdown", cropPointerDown);
 cropStage.addEventListener("pointermove", cropPointerMove);
@@ -346,9 +287,7 @@ cropStage.addEventListener("pointercancel", cropPointerUp);
 cropStage.addEventListener("wheel", (e) => {
   e.preventDefault();
   const delta = e.deltaY < 0 ? 1.08 : 0.93;
-  const minScale = cropBaseScale;
-  const maxScale = cropBaseScale * 3;
-  cropScale = Math.min(maxScale, Math.max(minScale, cropScale * delta));
+  cropScale = Math.min(cropBaseScale * 3, Math.max(cropBaseScale, cropScale * delta));
   cropZoomRange.value = Math.round((cropScale / cropBaseScale) * 100);
   applyCropTransform();
 }, { passive: false });
@@ -356,48 +295,30 @@ cropStage.addEventListener("wheel", (e) => {
 function closeCropModal(result) {
   cropOverlay.classList.remove("open");
   if (cropObjectUrl) { URL.revokeObjectURL(cropObjectUrl); cropObjectUrl = null; }
-  const resolve = cropResolve;
-  cropResolve = null;
+  const resolve = cropResolve; cropResolve = null;
   if (resolve) resolve(result);
 }
-
 cropCloseBtn.onclick = () => closeCropModal(null);
-
 cropSwapBtn.onclick = () => cropSwapInput.click();
 cropSwapInput.addEventListener("change", () => {
-  const file = cropSwapInput.files[0];
-  cropSwapInput.value = "";
+  const file = cropSwapInput.files[0]; cropSwapInput.value = "";
   if (file) loadFileIntoCropper(file);
 });
 
 cropConfirmBtn.onclick = () => {
-  const stageW = cropStage.clientWidth;
-  const stageH = cropStage.clientHeight;
-
+  const stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
   if (!stageW || !stageH || !cropScale || !cropNaturalW || !cropNaturalH) {
-    alert("Foto belum siap di-crop, coba tunggu sebentar lalu ulangi.");
-    return;
+    alert("Foto belum siap di-crop, coba tunggu sebentar lalu ulangi."); return;
   }
-
-  const outW = 1080;
-  const outH = Math.round(outW * (stageH / stageW));
-
+  const outW = 1080, outH = Math.round(outW * (stageH / stageW));
   const canvas = document.createElement("canvas");
-  canvas.width = outW;
-  canvas.height = outH;
+  canvas.width = outW; canvas.height = outH;
   const ctx = canvas.getContext("2d");
-
   const renderScale = outW / stageW;
-  const dispW = cropNaturalW * cropScale * renderScale;
-  const dispH = cropNaturalH * cropScale * renderScale;
-  const centerX = outW / 2 + cropOffsetX * renderScale;
-  const centerY = outH / 2 + cropOffsetY * renderScale;
-
+  const dispW = cropNaturalW * cropScale * renderScale, dispH = cropNaturalH * cropScale * renderScale;
+  const centerX = outW / 2 + cropOffsetX * renderScale, centerY = outH / 2 + cropOffsetY * renderScale;
   ctx.drawImage(cropImgEl, centerX - dispW / 2, centerY - dispH / 2, dispW, dispH);
-
-  canvas.toBlob((blob) => {
-    closeCropModal(blob);
-  }, "image/jpeg", 0.9);
+  canvas.toBlob((blob) => { closeCropModal(blob); }, "image/jpeg", 0.9);
 };
 
 function makeCroppedFile(blob, originalName) {
@@ -406,14 +327,10 @@ function makeCroppedFile(blob, originalName) {
 }
 
 document.getElementById("photos").addEventListener("change", async (e) => {
-  const files = Array.from(e.target.files);
-  e.target.value = ""; // biar file yang sama bisa dipilih ulang lain kali
+  const files = Array.from(e.target.files); e.target.value = "";
   for (const file of files) {
     const cropped = await openCropperForFile(file);
-    if (cropped) {
-      selectedFiles.push(makeCroppedFile(cropped, file.name));
-      renderNewPreview();
-    }
+    if (cropped) { selectedFiles.push(makeCroppedFile(cropped, file.name)); renderNewPreview(); }
   }
 });
 
@@ -429,16 +346,10 @@ function renderNewPreview() {
       <button type="button" class="editCropBtn" title="Atur ulang crop"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
       <button type="button" class="removeBtn" title="Hapus foto"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     `;
-    wrap.querySelector(".removeBtn").onclick = () => {
-      selectedFiles.splice(idx, 1);
-      renderNewPreview();
-    };
+    wrap.querySelector(".removeBtn").onclick = () => { selectedFiles.splice(idx, 1); renderNewPreview(); };
     wrap.querySelector(".editCropBtn").onclick = async () => {
       const cropped = await openCropperForFile(file);
-      if (cropped) {
-        selectedFiles[idx] = makeCroppedFile(cropped, file.name);
-        renderNewPreview();
-      }
+      if (cropped) { selectedFiles[idx] = makeCroppedFile(cropped, file.name); renderNewPreview(); }
     };
     preview.appendChild(wrap);
   });
@@ -465,9 +376,7 @@ function getLinksFromForm() {
     const inputs = row.querySelectorAll("input");
     const label = inputs[0].value.trim();
     const url = inputs[1].value.trim();
-    if (url) {
-      links.push({ label: label || "Buka video", url });
-    }
+    if (url) links.push({ label: label || "Buka video", url });
   });
   return links;
 }
@@ -478,39 +387,30 @@ function getTagsFromForm() {
   return raw.split(",").map(t => t.trim().replace(/^#+/, "").trim()).filter(Boolean);
 }
 
-function escapeAttr(str) {
-  return String(str).replace(/"/g, "&quot;");
-}
+function escapeAttr(str) { return String(str).replace(/"/g, "&quot;"); }
 
 document.getElementById("addLinkBtn").onclick = () => addLinkRow();
-addLinkRow(); // baris kosong pertama saat halaman dibuka
+addLinkRow();
 
 function resetForm() {
-  editingId = null;
-  editingExistingPhotos = [];
-  editingCode = null;
-  removedExistingPhotos = [];
+  editingId = null; editingExistingPhotos = []; editingCode = null; removedExistingPhotos = [];
   formTitle.textContent = "Tambah Konten Baru";
   submitBtn.textContent = "Bagikan Konten";
   cancelEditBtn.style.display = "none";
   document.getElementById("photos").value = "";
   document.getElementById("preview").innerHTML = "";
   existingPreview.innerHTML = "";
-  linksContainer.innerHTML = "";
-  addLinkRow();
+  linksContainer.innerHTML = ""; addLinkRow();
   document.getElementById("tags").value = "";
   document.getElementById("caption").value = "";
   document.getElementById("resultLink").style.display = "none";
-  selectedFiles = [];
-  formMsg.textContent = "";
+  selectedFiles = []; formMsg.textContent = "";
 }
 
 cancelEditBtn.onclick = resetForm;
 
 submitBtn.onclick = async () => {
-  formMsg.className = "msg";
-  formMsg.textContent = "";
-
+  formMsg.className = "msg"; formMsg.textContent = "";
   const links = getLinksFromForm();
   const tags = getTagsFromForm();
   const caption = document.getElementById("caption").value.trim();
@@ -523,10 +423,6 @@ submitBtn.onclick = async () => {
 
   submitBtn.disabled = true;
   formMsg.textContent = "Memproses...";
-
-  // Foto yang baru diupload pada percobaan ini + penanda apakah datanya sudah
-  // masuk Firestore. Kalau proses gagal SEBELUM tersimpan, foto-foto itu jadi
-  // file yatim di R2 (tidak ada post yang memakainya) -> dibersihkan di catch.
   const uploadedNow = [];
   let dbSaved = false;
 
@@ -537,64 +433,36 @@ submitBtn.onclick = async () => {
       i++;
       formMsg.textContent = `Mengunggah foto ${i} dari ${selectedFiles.length}...`;
       const url = await uploadToCloudflare(file);
-      photoUrls.push(url);
-      uploadedNow.push(url);
+      photoUrls.push(url); uploadedNow.push(url);
     }
-
     formMsg.textContent = "Menyimpan data...";
 
     if (editingId) {
-      if (!editingCode) {
-        formMsg.textContent = "Membuat kode link...";
-        editingCode = await generateUniqueCode();
-      }
-      await updateDoc(doc(db, "posts", editingId), {
-        photoUrls,
-        links,
-        tags,
-        caption: caption || null,
-        code: editingCode
-      });
+      if (!editingCode) { formMsg.textContent = "Membuat kode link..."; editingCode = await generateUniqueCode(); }
+      await updateDoc(doc(db, "posts", editingId), { photoUrls, links, tags, caption: caption || null, code: editingCode });
       dbSaved = true;
-      formMsg.className = "msg success";
-      formMsg.textContent = "Materi berhasil diperbarui!";
-
-      // Foto lama yang dibuang/diganti selama sesi edit ini BARU sekarang
-      // benar-benar dihapus dari R2 -- setelah dipastikan perubahan post-nya
-      // berhasil tersimpan (bukan saat tombol ✕ diklik), supaya kalau admin
-      // batal edit, foto lama tidak ikut kehapus sia-sia.
+      formMsg.className = "msg success"; formMsg.textContent = "Materi berhasil diperbarui!";
       if (removedExistingPhotos.length > 0) {
         deleteFromCloudflare(removedExistingPhotos).then((cleaned) => {
           if (!cleaned) {
             formMsg.className = "msg error";
-            formMsg.textContent = "Materi tersimpan, tapi sebagian foto lama gagal dihapus dari Cloudflare R2 (file masih ada di bucket).";
+            formMsg.textContent = "Materi tersimpan, tapi sebagian foto lama gagal dihapus dari Cloudflare R2.";
           }
         });
         removedExistingPhotos = [];
       }
-
       const editedUrl = `${window.location.origin}/p/${editingCode}`;
       const editedResultEl = document.getElementById("resultLink");
       editedResultEl.style.display = "block";
       editedResultEl.innerHTML = `Link konten ini:<br><b>${editedUrl}</b><br><button type="button" class="shareBtn" style="width:auto; margin-top:8px; padding:8px 14px; font-size:12px; border-radius:6px; color:#fff; border:none; cursor:pointer;">${shareIconSvg}Bagikan</button>`;
       editedResultEl.querySelector(".shareBtn").onclick = () => sharePostLink(editedUrl);
-
       resetFieldsOnly();
     } else {
       formMsg.textContent = "Membuat kode link...";
       const code = await generateUniqueCode();
-      const docRef = await addDoc(collection(db, "posts"), {
-        photoUrls,
-        links,
-        tags,
-        caption: caption || null,
-        code,
-        createdAt: serverTimestamp()
-      });
+      await addDoc(collection(db, "posts"), { photoUrls, links, tags, caption: caption || null, code, createdAt: serverTimestamp() });
       dbSaved = true;
-      formMsg.className = "msg success";
-      formMsg.textContent = "Berhasil dibagikan konten!";
-
+      formMsg.className = "msg success"; formMsg.textContent = "Berhasil dibagikan konten!";
       const postUrl = `${window.location.origin}/p/${code}`;
       const resultEl = document.getElementById("resultLink");
       resultEl.style.display = "block";
@@ -603,12 +471,9 @@ submitBtn.onclick = async () => {
       resetFieldsOnly();
     }
   } catch (err) {
-    formMsg.className = "msg error";
-    formMsg.textContent = "Gagal: " + err.message;
+    formMsg.className = "msg error"; formMsg.textContent = "Gagal: " + err.message;
     console.error(err);
-    if (!dbSaved && uploadedNow.length > 0) {
-      deleteFromCloudflare(uploadedNow);
-    }
+    if (!dbSaved && uploadedNow.length > 0) deleteFromCloudflare(uploadedNow);
   } finally {
     submitBtn.disabled = false;
   }
@@ -619,39 +484,28 @@ function resetFieldsOnly() {
   document.getElementById("preview").innerHTML = "";
   selectedFiles = [];
   if (!editingId) {
-    linksContainer.innerHTML = "";
-    addLinkRow();
+    linksContainer.innerHTML = ""; addLinkRow();
     document.getElementById("tags").value = "";
     document.getElementById("caption").value = "";
   }
 }
 
 function startEdit(id, data) {
-  editingId = id;
-  editingExistingPhotos = data.photoUrls || [];
-  editingCode = data.code || null;
-  removedExistingPhotos = [];
-  selectedFiles = [];
+  editingId = id; editingExistingPhotos = data.photoUrls || [];
+  editingCode = data.code || null; removedExistingPhotos = []; selectedFiles = [];
   document.getElementById("preview").innerHTML = "";
   formTitle.textContent = "Edit konten";
   submitBtn.textContent = "Simpan Perubahan";
   cancelEditBtn.style.display = "block";
-
   linksContainer.innerHTML = "";
   const existingLinks = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
-  if (existingLinks.length === 0) {
-    addLinkRow();
-  } else {
-    existingLinks.forEach(l => addLinkRow(l.label, l.url));
-  }
-
+  if (existingLinks.length === 0) addLinkRow();
+  else existingLinks.forEach(l => addLinkRow(l.label, l.url));
   document.getElementById("tags").value = (data.tags || []).join(", ");
   document.getElementById("caption").value = data.caption || "";
   document.getElementById("resultLink").style.display = "none";
-
   existingPreview.innerHTML = "";
   renderExistingPreview();
-
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -671,29 +525,20 @@ function renderExistingPreview() {
       renderExistingPreview();
     };
     wrap.querySelector(".editCropBtn").onclick = () => {
-      // Foto lama sudah ter-hosting di server (bukan file lokal), jadi tidak
-      // bisa dibuka ulang untuk di-crop langsung (kendala CORS canvas).
-      // Solusinya: pilih foto baru sebagai pengganti, lalu foto baru itu
-      // yang melewati alur cropping seperti biasa.
       const swapInput = document.createElement("input");
-      swapInput.type = "file";
-      swapInput.accept = "image/*";
-      swapInput.style.display = "none";
+      swapInput.type = "file"; swapInput.accept = "image/*"; swapInput.style.display = "none";
       swapInput.onchange = async () => {
-        const file = swapInput.files[0];
-        swapInput.remove();
+        const file = swapInput.files[0]; swapInput.remove();
         if (!file) return;
         const cropped = await openCropperForFile(file);
         if (cropped) {
           editingExistingPhotos = editingExistingPhotos.filter(u => u !== url);
           removedExistingPhotos.push(url);
           selectedFiles.push(makeCroppedFile(cropped, file.name));
-          renderExistingPreview();
-          renderNewPreview();
+          renderExistingPreview(); renderNewPreview();
         }
       };
-      document.body.appendChild(swapInput);
-      swapInput.click();
+      document.body.appendChild(swapInput); swapInput.click();
     };
     existingPreview.appendChild(wrap);
   });
@@ -703,55 +548,39 @@ async function removePost(id, photoUrls) {
   if (!confirm("Yakin hapus materi ini? Tidak bisa dikembalikan.")) return;
   try {
     await deleteDoc(doc(db, "posts", id));
-    // Post-nya sudah pasti terhapus dari Firestore -- sekarang hapus juga
-    // semua foto post ini dari Cloudflare R2 supaya tidak jadi file yatim
-    // yang menumpuk (tetap memakan kuota storage walau tidak terpakai lagi).
     if (photoUrls && photoUrls.length > 0) {
       const cleaned = await deleteFromCloudflare(photoUrls);
-      if (!cleaned) {
-        alert("Post sudah terhapus dari database, tetapi sebagian file foto gagal dihapus dari Cloudflare R2 (file masih tersimpan di bucket). Cek koneksi/login lalu hapus manual dari dashboard Cloudflare bila perlu.");
-      }
+      if (!cleaned) alert("Post terhapus dari database, tapi sebagian foto gagal dihapus dari Cloudflare R2.");
     }
   } catch (err) {
     alert("Gagal menghapus: " + err.message);
   }
 }
 
-let allPostsCache = []; // [{ id, data }] -- semua post, hasil listener realtime
+let allPostsCache = [];
 let currentAdminSort = "terbaru";
 
 function listenPosts() {
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
     allPostsCache = [];
-    snapshot.forEach((docSnap) => {
-      allPostsCache.push({ id: docSnap.id, data: docSnap.data() });
-    });
+    snapshot.forEach((docSnap) => { allPostsCache.push({ id: docSnap.id, data: docSnap.data() }); });
     applyAdminSearch();
   });
 }
 
 function normalizeSearchText(str) {
-  return (str || "")
-    .toString()
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // buang diakritik biar lebih akurat
-    .trim();
+  return (str || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
-// Cari MENYELURUH: judul (caption), tag, DAN teks/URL setiap link (termasuk
-// yang berfungsi sebagai info "SEO" per post -- label link biasanya berisi
-// kata kunci konten itu). Semua digabung jadi satu blok teks lalu dicari.
 function getPostSearchBlob(data) {
   const tagsList = data.tags || [];
   const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
-  const parts = [
-    data.caption || "",
-    tagsList.join(" "),
+  return normalizeSearchText([
+    data.caption || "", tagsList.join(" "),
     linksList.map(l => `${l.label || ""} ${l.url || ""}`).join(" "),
     data.code || ""
-  ];
-  return normalizeSearchText(parts.join(" "));
+  ].join(" "));
 }
 
 function highlightMatch(text, terms) {
@@ -761,19 +590,15 @@ function highlightMatch(text, terms) {
   terms.forEach(term => {
     if (!term) return;
     const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp("(" + safeTerm + ")", "gi");
-    escaped = escaped.replace(re, "<mark>$1</mark>");
+    escaped = escaped.replace(new RegExp("(" + safeTerm + ")", "gi"), "<mark>$1</mark>");
   });
   return escaped;
 }
 
 function sortAdminPosts(list) {
   const arr = [...list];
-  if (currentAdminSort === "terlama") {
-    arr.reverse();
-  } else if (currentAdminSort === "terpopuler") {
-    arr.sort((a, b) => (b.data.postViews || 0) - (a.data.postViews || 0));
-  }
+  if (currentAdminSort === "terlama") arr.reverse();
+  else if (currentAdminSort === "terpopuler") arr.sort((a, b) => (b.data.postViews || 0) - (a.data.postViews || 0));
   return arr;
 }
 
@@ -797,8 +622,6 @@ document.getElementById("adminSearchClear").addEventListener("click", () => {
 });
 
 function applyAdminSearch() {
-  // Total = jumlah dokumen di Firestore saat ini (listener dasbor tanpa limit),
-  // jadi otomatis berkurang begitu ada post yang dihapus.
   document.getElementById("totalPostCount").textContent = allPostsCache.length;
   const listEl = document.getElementById("postList");
   const countEl = document.getElementById("adminSearchCount");
@@ -806,56 +629,28 @@ function applyAdminSearch() {
   const rawQuery = document.getElementById("adminSearchInput").value;
   const normalizedQuery = normalizeSearchText(rawQuery);
   const terms = normalizedQuery.split(/\s+/).filter(Boolean);
-
   clearBtn.style.display = rawQuery ? "flex" : "none";
 
   const filtered = terms.length
-    ? allPostsCache.filter(({ data }) => {
-        const blob = getPostSearchBlob(data);
-        return terms.every(term => blob.includes(term));
-      })
+    ? allPostsCache.filter(({ data }) => { const blob = getPostSearchBlob(data); return terms.every(term => blob.includes(term)); })
     : allPostsCache;
 
-  if (terms.length) {
-    countEl.textContent = `${filtered.length} dari ${allPostsCache.length} postingan cocok`;
-  } else {
-    countEl.textContent = "";
-  }
+  countEl.textContent = terms.length ? `${filtered.length} dari ${allPostsCache.length} postingan cocok` : "";
 
-  if (allPostsCache.length === 0) {
-    listEl.innerHTML = '<p class="empty">Belum ada materi.</p>';
-    return;
-  }
-  if (filtered.length === 0) {
-    listEl.innerHTML = '<p class="empty">Tidak ada postingan yang cocok dengan pencarian.</p>';
-    return;
-  }
+  if (allPostsCache.length === 0) { listEl.innerHTML = '<p class="empty">Belum ada materi.</p>'; return; }
+  if (filtered.length === 0) { listEl.innerHTML = '<p class="empty">Tidak ada postingan yang cocok dengan pencarian.</p>'; return; }
 
   listEl.innerHTML = "";
   sortAdminPosts(filtered).forEach(({ id, data }) => {
     const date = data.createdAt?.toDate
       ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
       : "";
-
-    const thumbs = (data.photoUrls || [])
-      .map(url => `<img ${imgAttrs(url)}>`)
-      .join("");
-
+    const thumbs = (data.photoUrls || []).map(url => `<img ${imgAttrs(url)}>`).join("");
     const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
-    const linksHtml = linksList
-      .map(l => `<div class="link">${linkIconSvgSmall}${highlightMatch(l.label, terms)}: ${highlightMatch(l.url, terms)}</div>`)
-      .join("");
-
+    const linksHtml = linksList.map(l => `<div class="link">${linkIconSvgSmall}${highlightMatch(l.label, terms)}: ${highlightMatch(l.url, terms)}</div>`).join("");
     const tagsList = data.tags || [];
-    const tagsHtml = tagsList.length
-      ? `<div class="link">${tagIconSvgSmall}${tagsList.map(t => highlightMatch(t, terms)).join(", ")}</div>`
-      : "";
-
-    // "Dilihat" = berapa kali post/gambarnya DIBUKA lewat link (/p/kode).
-    // "Klik link" = berapa kali tombol link video di dalamnya DIKLIK.
-    // Dua metrik terpisah -- yang satu soal post-nya, yang satu soal link-nya.
-    const postViews = data.postViews || 0;
-    const linkClicks = data.linkClicks || 0;
+    const tagsHtml = tagsList.length ? `<div class="link">${tagIconSvgSmall}${tagsList.map(t => highlightMatch(t, terms)).join(", ")}</div>` : "";
+    const postViews = data.postViews || 0, linkClicks = data.linkClicks || 0;
     const viewsHtml = `<div class="link views-count">${eyeIconSvgSmall}${postViews} dilihat &nbsp;·&nbsp; ${linkIconSvgSmall}${linkClicks} klik link</div>`;
 
     const item = document.createElement("div");
@@ -864,18 +659,14 @@ function applyAdminSearch() {
       <div class="date">${date}</div>
       ${data.caption ? `<div class="caption">${highlightMatch(data.caption, terms)}</div>` : ""}
       <div class="thumbs">${thumbs}</div>
-      ${linksHtml}
-      ${tagsHtml}
-      ${viewsHtml}
+      ${linksHtml}${tagsHtml}${viewsHtml}
       <div class="actions">
         <button class="editBtn">Edit</button>
         <button class="shareBtn">Bagikan</button>
         <button class="deleteBtn">Hapus</button>
       </div>
     `;
-    const postUrl = data.code
-      ? `${window.location.origin}/p/${data.code}`
-      : `${window.location.origin}/?post=${id}`;
+    const postUrl = data.code ? `${window.location.origin}/p/${data.code}` : `${window.location.origin}/?post=${id}`;
     item.querySelector(".editBtn").onclick = () => startEdit(id, data);
     item.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
     item.querySelector(".deleteBtn").onclick = () => removePost(id, data.photoUrls);
@@ -883,9 +674,7 @@ function applyAdminSearch() {
   });
 }
 
-/* ================== SLOT LINK FLEKSIBEL (3 slot) ==================
-   Disimpan di settings/chipbar: chip{1..3}Name, chip{1..3}Link, chip{1..3}Active.
-   Ditampilkan di homepage sebagai tab kecil di bawah tombol link tiap post. */
+/* ================== SLOT LINK FLEKSIBEL ================== */
 async function loadChipBarSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "chipbar"));
@@ -896,15 +685,12 @@ async function loadChipBarSettings() {
       document.getElementById(`chip${n}Link`).value = data[`chip${n}Link`] || "";
       document.getElementById(`chip${n}Active`).checked = data[`chip${n}Active`] !== false;
     });
-  } catch (err) {
-    console.error("Gagal memuat slot link fleksibel:", err);
-  }
+  } catch (err) { console.error("Gagal memuat slot link fleksibel:", err); }
 }
 
 document.getElementById("saveChipBarBtn").onclick = async () => {
   const msgEl = document.getElementById("chipBarMsg");
   msgEl.className = "msg";
-
   const payload = {};
   for (const n of [1, 2, 3]) {
     const name = document.getElementById(`chip${n}Name`).value.trim();
@@ -923,35 +709,63 @@ document.getElementById("saveChipBarBtn").onclick = async () => {
     payload[`chip${n}Link`] = link || null;
     payload[`chip${n}Active`] = document.getElementById(`chip${n}Active`).checked;
   }
-
   msgEl.textContent = "Menyimpan...";
   try {
     await setDoc(doc(db, "settings", "chipbar"), payload);
-    msgEl.className = "msg success";
-    msgEl.textContent = "Slot link berhasil disimpan!";
-  } catch (err) {
-    msgEl.className = "msg error";
-    msgEl.textContent = "Gagal: " + err.message;
-  }
+    msgEl.className = "msg success"; msgEl.textContent = "Slot link berhasil disimpan!";
+  } catch (err) { msgEl.className = "msg error"; msgEl.textContent = "Gagal: " + err.message; }
 };
 
-/* ================== DOMAIN LINK EMBED (settings/linkDomain) ==================
-   Mendukung BANYAK domain sumber yang semuanya diarahkan ke satu domain tujuan.
-   - target  : domain tujuan (misal: https://domain-baru.com)
-   - sources : array domain sumber [https://A.com, https://B.com, ...]
+/* ================== DOMAIN LINK EMBED — SISTEM GRUP ==================
+   Setiap "grup" = satu platform video hosting:
+   - target  : domain tujuan platform ini
+   - sources : domain-domain lama platform ini yang dialihkan ke target
 
-   Untuk menambah/menghapus domain sumber, tinggal klik "+ Tambah Domain Sumber"
-   atau ✕ di baris yang ingin dihapus, lalu simpan. Domain yang tidak masuk
-   daftar sumber tetap jalan apa adanya di halaman pengunjung.
+   Cara pakai di dasbor:
+   - Klik "+ Tambah Grup Platform" untuk menambah platform baru
+   - Dalam setiap grup, isi domain tujuan dan tambah domain sumber sebanyak yang dibutuhkan
+   - Klik "Hapus Grup" untuk menghapus seluruh platform
+   - Klik ✕ di baris domain sumber untuk menghapus satu sumber saja
+   - Simpan → berlaku langsung di halaman pengunjung */
 
-   Kompatibilitas mundur: field "domain" lama (sebelum fitur multi-domain)
-   masih terbaca sebagai target via fallback di index.js. */
+const groupsContainerEl = document.getElementById("linkDomainGroupsContainer");
 
-function sourcesListEl() {
-  return document.getElementById("linkDomainSourcesList");
+function createGroupBlock(target = "", sources = []) {
+  const groupIdx = groupsContainerEl.children.length + 1;
+  const block = document.createElement("div");
+  block.className = "domain-group-block";
+  block.innerHTML = `
+    <div class="domain-group-header">
+      <span class="domain-group-label">Platform ${groupIdx}</span>
+      <button type="button" class="domain-group-remove-btn" title="Hapus grup ini">Hapus Grup</button>
+    </div>
+    <label>Domain Tujuan</label>
+    <input type="url" class="domain-target-input" placeholder="https://domain-baru.com" value="${escapeAttr(target)}">
+    <label style="margin-top:10px;">Domain Sumber</label>
+    <div class="domain-sources-list"></div>
+    <button type="button" class="add-source-btn">+ Tambah Domain Sumber</button>
+  `;
+
+  block.querySelector(".domain-group-remove-btn").onclick = () => {
+    block.remove();
+    renumberGroups();
+  };
+
+  block.querySelector(".add-source-btn").onclick = () => {
+    addSourceRowToBlock(block.querySelector(".domain-sources-list"));
+  };
+
+  const sourcesList = block.querySelector(".domain-sources-list");
+  if (sources.length > 0) {
+    sources.forEach(src => addSourceRowToBlock(sourcesList, src));
+  } else {
+    addSourceRowToBlock(sourcesList); // satu baris kosong untuk mulai isi
+  }
+
+  groupsContainerEl.appendChild(block);
 }
 
-function addSourceRow(value = "") {
+function addSourceRowToBlock(sourcesList, value = "") {
   const row = document.createElement("div");
   row.className = "link-row";
   row.innerHTML = `
@@ -959,24 +773,37 @@ function addSourceRow(value = "") {
     <button type="button" title="Hapus domain sumber ini">✕</button>
   `;
   row.querySelector("button").onclick = () => row.remove();
-  sourcesListEl().appendChild(row);
+  sourcesList.appendChild(row);
 }
 
-document.getElementById("addSourceDomainBtn").onclick = () => addSourceRow();
+function renumberGroups() {
+  groupsContainerEl.querySelectorAll(".domain-group-label").forEach((label, idx) => {
+    label.textContent = `Platform ${idx + 1}`;
+  });
+}
+
+document.getElementById("addDomainGroupBtn").onclick = () => createGroupBlock();
 
 async function loadLinkDomainSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "linkDomain"));
-    if (snap.exists()) {
-      const data = snap.data();
-      // Kompatibilitas mundur: field "domain" lama → target
-      document.getElementById("linkDomainTarget").value = data.target || data.domain || "";
-      const sources = Array.isArray(data.sources) ? data.sources : [];
-      sourcesListEl().innerHTML = "";
-      sources.forEach(addSourceRow);
+    groupsContainerEl.innerHTML = "";
+    if (!snap.exists()) { createGroupBlock(); return; }
+    const data = snap.data();
+
+    if (Array.isArray(data.groups) && data.groups.length > 0) {
+      // Format baru: array of groups
+      data.groups.forEach(g => createGroupBlock(g.target || "", g.sources || []));
+    } else if (data.target || data.domain) {
+      // Format lama → satu grup
+      createGroupBlock(data.target || data.domain || "", Array.isArray(data.sources) ? data.sources : []);
+    } else {
+      createGroupBlock();
     }
   } catch (err) {
     console.error("Gagal memuat pengaturan domain link:", err);
+    groupsContainerEl.innerHTML = "";
+    createGroupBlock();
   }
 }
 
@@ -984,40 +811,45 @@ document.getElementById("saveLinkDomainBtn").onclick = async () => {
   const msgEl = document.getElementById("linkDomainMsg");
   msgEl.className = "msg";
 
-  const target = document.getElementById("linkDomainTarget").value.trim();
-  if (target && !/^https?:\/\//i.test(target)) {
-    msgEl.className = "msg error";
-    msgEl.textContent = "Domain tujuan harus diawali http:// atau https://";
-    return;
-  }
+  const groups = [];
+  let hasError = false;
 
-  // Kumpulkan semua domain sumber dari baris input yang ada
-  const sources = Array.from(sourcesListEl().querySelectorAll(".source-input"))
-    .map(el => el.value.trim())
-    .filter(Boolean);
+  groupsContainerEl.querySelectorAll(".domain-group-block").forEach((block, idx) => {
+    if (hasError) return;
+    const target = block.querySelector(".domain-target-input").value.trim();
+    const sources = Array.from(block.querySelectorAll(".source-input"))
+      .map(el => el.value.trim()).filter(Boolean);
 
-  for (const src of sources) {
-    if (!/^https?:\/\//i.test(src)) {
+    if (target && !/^https?:\/\//i.test(target)) {
       msgEl.className = "msg error";
-      msgEl.textContent = `Domain sumber "${src}" harus diawali http:// atau https://`;
-      return;
+      msgEl.textContent = `Platform ${idx + 1}: domain tujuan harus diawali http:// atau https://`;
+      hasError = true; return;
     }
-  }
+    for (const src of sources) {
+      if (!/^https?:\/\//i.test(src)) {
+        msgEl.className = "msg error";
+        msgEl.textContent = `Platform ${idx + 1}: domain sumber "${src}" harus diawali http:// atau https://`;
+        hasError = true; return;
+      }
+    }
+    // Hanya simpan grup yang punya target (grup kosong diabaikan)
+    if (target) groups.push({ target, sources });
+  });
+
+  if (hasError) return;
 
   msgEl.textContent = "Menyimpan...";
   try {
-    await setDoc(doc(db, "settings", "linkDomain"), {
-      target: target || null,
-      sources
-    });
+    await setDoc(doc(db, "settings", "linkDomain"), { groups });
     msgEl.className = "msg success";
-    msgEl.textContent = "Pengaturan domain berhasil disimpan!";
+    msgEl.textContent = `${groups.length} grup platform berhasil disimpan!`;
   } catch (err) {
     msgEl.className = "msg error";
     msgEl.textContent = "Gagal: " + err.message;
   }
 };
 
+/* ================== KONTAK ================== */
 async function loadContactSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "contact"));
@@ -1027,47 +859,29 @@ async function loadContactSettings() {
       document.getElementById("contactFacebook").value = data.facebook || "";
       document.getElementById("contactWhatsapp").value = data.whatsapp || "";
     }
-  } catch (err) {
-    console.error("Gagal memuat pengaturan kontak:", err);
-  }
+  } catch (err) { console.error("Gagal memuat pengaturan kontak:", err); }
 }
 
 document.getElementById("saveContactBtn").onclick = async () => {
   const msgEl = document.getElementById("contactMsg");
-  msgEl.className = "msg";
-  msgEl.textContent = "Menyimpan...";
+  msgEl.className = "msg"; msgEl.textContent = "Menyimpan...";
   try {
     await setDoc(doc(db, "settings", "contact"), {
       telegram: document.getElementById("contactTelegram").value.trim() || null,
       facebook: document.getElementById("contactFacebook").value.trim() || null,
       whatsapp: document.getElementById("contactWhatsapp").value.trim() || null
     });
-    msgEl.className = "msg success";
-    msgEl.textContent = "Pengaturan link sosmed berhasil disimpan!";
-  } catch (err) {
-    msgEl.className = "msg error";
-    msgEl.textContent = "Gagal: " + err.message;
-  }
+    msgEl.className = "msg success"; msgEl.textContent = "Pengaturan link sosmed berhasil disimpan!";
+  } catch (err) { msgEl.className = "msg error"; msgEl.textContent = "Gagal: " + err.message; }
 };
 
 async function sharePostLink(url) {
-  const shareData = { url: url };
   if (navigator.share) {
-    try {
-      await navigator.share(shareData);
-    } catch (err) {
-      // Pengguna membatalkan share, tidak perlu ditampilkan sebagai error
-    }
+    try { await navigator.share({ url }); } catch (err) {}
   } else if (navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(url);
-      alert("Link disalin! Silakan tempel ke aplikasi yang diinginkan.");
-    } catch (err) {
-      prompt("Salin link ini secara manual:", url);
-    }
-  } else {
-    prompt("Salin link ini secara manual:", url);
-  }
+    try { await navigator.clipboard.writeText(url); alert("Link disalin!"); }
+    catch (err) { prompt("Salin link ini secara manual:", url); }
+  } else { prompt("Salin link ini secara manual:", url); }
 }
 
 function escapeHtml(str) {
