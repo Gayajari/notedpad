@@ -147,7 +147,7 @@ onAuthStateChanged(auth, (user) => {
 // Accordion pengaturan: disembunyikan dulu, baru muncul kalau bar-nya
 // diklik. Dipakai untuk semua bagian "pengaturan" di dasbor (saat ini baru
 // Link Sosmed, tapi pola ini scalable untuk pengaturan lain di masa depan).
-function setupAccordion(toggleId, bodyId, arrowIcon) {
+function setupAccordion(toggleId, bodyId) {
   const toggleBtn = document.getElementById(toggleId);
   const body = document.getElementById(bodyId);
   if (!toggleBtn || !body) return;
@@ -936,13 +936,45 @@ document.getElementById("saveChipBarBtn").onclick = async () => {
 };
 
 /* ================== DOMAIN LINK EMBED (settings/linkDomain) ==================
-   Satu field "domain" yang menimpa host SEMUA link embed saat ditampilkan
-   di halaman utama (lihat replaceEmbedDomain di js/index.js). Data link
-   asli di tiap post TIDAK diubah -- cuma host-nya yang ditimpa saat render. */
+   Mendukung BANYAK domain sumber yang semuanya diarahkan ke satu domain tujuan.
+   - target  : domain tujuan (misal: https://domain-baru.com)
+   - sources : array domain sumber [https://A.com, https://B.com, ...]
+
+   Untuk menambah/menghapus domain sumber, tinggal klik "+ Tambah Domain Sumber"
+   atau ✕ di baris yang ingin dihapus, lalu simpan. Domain yang tidak masuk
+   daftar sumber tetap jalan apa adanya di halaman pengunjung.
+
+   Kompatibilitas mundur: field "domain" lama (sebelum fitur multi-domain)
+   masih terbaca sebagai target via fallback di index.js. */
+
+function sourcesListEl() {
+  return document.getElementById("linkDomainSourcesList");
+}
+
+function addSourceRow(value = "") {
+  const row = document.createElement("div");
+  row.className = "link-row";
+  row.innerHTML = `
+    <input type="url" class="source-input" placeholder="https://domain-lama.com" value="${escapeAttr(value)}">
+    <button type="button" title="Hapus domain sumber ini">✕</button>
+  `;
+  row.querySelector("button").onclick = () => row.remove();
+  sourcesListEl().appendChild(row);
+}
+
+document.getElementById("addSourceDomainBtn").onclick = () => addSourceRow();
+
 async function loadLinkDomainSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "linkDomain"));
-    document.getElementById("linkDomainInput").value = snap.exists() ? (snap.data().domain || "") : "";
+    if (snap.exists()) {
+      const data = snap.data();
+      // Kompatibilitas mundur: field "domain" lama → target
+      document.getElementById("linkDomainTarget").value = data.target || data.domain || "";
+      const sources = Array.isArray(data.sources) ? data.sources : [];
+      sourcesListEl().innerHTML = "";
+      sources.forEach(addSourceRow);
+    }
   } catch (err) {
     console.error("Gagal memuat pengaturan domain link:", err);
   }
@@ -951,17 +983,35 @@ async function loadLinkDomainSettings() {
 document.getElementById("saveLinkDomainBtn").onclick = async () => {
   const msgEl = document.getElementById("linkDomainMsg");
   msgEl.className = "msg";
-  const value = document.getElementById("linkDomainInput").value.trim();
-  if (value && !/^https?:\/\//i.test(value)) {
+
+  const target = document.getElementById("linkDomainTarget").value.trim();
+  if (target && !/^https?:\/\//i.test(target)) {
     msgEl.className = "msg error";
-    msgEl.textContent = "Domain harus diawali http:// atau https://";
+    msgEl.textContent = "Domain tujuan harus diawali http:// atau https://";
     return;
   }
+
+  // Kumpulkan semua domain sumber dari baris input yang ada
+  const sources = Array.from(sourcesListEl().querySelectorAll(".source-input"))
+    .map(el => el.value.trim())
+    .filter(Boolean);
+
+  for (const src of sources) {
+    if (!/^https?:\/\//i.test(src)) {
+      msgEl.className = "msg error";
+      msgEl.textContent = `Domain sumber "${src}" harus diawali http:// atau https://`;
+      return;
+    }
+  }
+
   msgEl.textContent = "Menyimpan...";
   try {
-    await setDoc(doc(db, "settings", "linkDomain"), { domain: value || null });
+    await setDoc(doc(db, "settings", "linkDomain"), {
+      target: target || null,
+      sources
+    });
     msgEl.className = "msg success";
-    msgEl.textContent = "Domain link berhasil disimpan!";
+    msgEl.textContent = "Pengaturan domain berhasil disimpan!";
   } catch (err) {
     msgEl.className = "msg error";
     msgEl.textContent = "Gagal: " + err.message;
