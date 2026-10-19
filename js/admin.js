@@ -108,6 +108,7 @@ const formCard = document.getElementById("formCard");
 const listCard = document.getElementById("listCard");
 const contactCard = document.getElementById("contactCard");
 const chipBarCard = document.getElementById("chipBarCard");
+const linkDomainCard = document.getElementById("linkDomainCard");
 const loginMsg = document.getElementById("loginMsg");
 const formMsg = document.getElementById("formMsg");
 const formTitle = document.getElementById("formTitleText");
@@ -128,8 +129,10 @@ onAuthStateChanged(auth, (user) => {
     listCard.style.display = "block";
     contactCard.style.display = "block";
     chipBarCard.style.display = "block";
+    linkDomainCard.style.display = "block";
     loadContactSettings();
     loadChipBarSettings();
+    loadLinkDomainSettings();
     listenPosts();
   } else {
     loginCard.style.display = "block";
@@ -137,6 +140,7 @@ onAuthStateChanged(auth, (user) => {
     listCard.style.display = "none";
     contactCard.style.display = "none";
     chipBarCard.style.display = "none";
+    linkDomainCard.style.display = "none";
   }
 });
 
@@ -155,6 +159,7 @@ function setupAccordion(toggleId, bodyId, arrowIcon) {
 }
 setupAccordion("contactToggle", "contactBody");
 setupAccordion("chipBarToggle", "chipBarBody");
+setupAccordion("linkDomainToggle", "linkDomainBody");
 
 document.getElementById("loginBtn").onclick = async () => {
   loginMsg.textContent = "";
@@ -924,6 +929,39 @@ document.getElementById("saveChipBarBtn").onclick = async () => {
     await setDoc(doc(db, "settings", "chipbar"), payload);
     msgEl.className = "msg success";
     msgEl.textContent = "Slot link berhasil disimpan!";
+  } catch (err) {
+    msgEl.className = "msg error";
+    msgEl.textContent = "Gagal: " + err.message;
+  }
+};
+
+/* ================== DOMAIN LINK EMBED (settings/linkDomain) ==================
+   Satu field "domain" yang menimpa host SEMUA link embed saat ditampilkan
+   di halaman utama (lihat replaceEmbedDomain di js/index.js). Data link
+   asli di tiap post TIDAK diubah -- cuma host-nya yang ditimpa saat render. */
+async function loadLinkDomainSettings() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "linkDomain"));
+    document.getElementById("linkDomainInput").value = snap.exists() ? (snap.data().domain || "") : "";
+  } catch (err) {
+    console.error("Gagal memuat pengaturan domain link:", err);
+  }
+}
+
+document.getElementById("saveLinkDomainBtn").onclick = async () => {
+  const msgEl = document.getElementById("linkDomainMsg");
+  msgEl.className = "msg";
+  const value = document.getElementById("linkDomainInput").value.trim();
+  if (value && !/^https?:\/\//i.test(value)) {
+    msgEl.className = "msg error";
+    msgEl.textContent = "Domain harus diawali http:// atau https://";
+    return;
+  }
+  msgEl.textContent = "Menyimpan...";
+  try {
+    await setDoc(doc(db, "settings", "linkDomain"), { domain: value || null });
+    msgEl.className = "msg success";
+    msgEl.textContent = "Domain link berhasil disimpan!";
   } catch (err) {
     msgEl.className = "msg error";
     msgEl.textContent = "Gagal: " + err.message;
