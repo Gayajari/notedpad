@@ -13,16 +13,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Cache lokal (IndexedDB) -- data post/settings yang sudah pernah diambil
-// disimpan di browser pengunjung. Kunjungan berikutnya, Firestore langsung
-// sajikan dulu dari cache ini (instan, tanpa request jaringan), baru
-// disinkronkan lagi ke server di belakang layar. Iritnya di bandwidth
-// terasa terutama untuk pengunjung yang bolak-balik buka situs ini.
 enableIndexedDbPersistence(db).catch((err) => {
   if (err.code === "failed-precondition") {
-    // Situs ini sedang terbuka di beberapa tab sekaligus -- cache lokal
-    // cuma bisa aktif di satu tab dalam satu waktu. Situs tetap jalan
-    // normal, cuma tanpa cache di tab-tab tambahan itu.
     console.warn("Cache lokal Firestore tidak aktif: situs terbuka di beberapa tab.");
   } else if (err.code === "unimplemented") {
     console.warn("Cache lokal Firestore tidak didukung browser ini.");
@@ -37,8 +29,6 @@ const shortCode = shortCodeMatch ? shortCodeMatch[1] : null;
 const postIdParam = new URLSearchParams(window.location.search).get("post");
 const tagParam = new URLSearchParams(window.location.search).get("tag");
 
-// Kode pendek (domain/p/KODE) dicocokkan ke doc id lewat field "code".
-// Link lama (?post=id) tetap didukung untuk kompatibilitas.
 async function resolvePostId() {
   if (shortCode) {
     const qCode = query(collection(db, "posts"), where("code", "==", shortCode), limit(1));
@@ -50,19 +40,12 @@ async function resolvePostId() {
 
 let allDocsCache = [];
 const ALL_DOCS_LIMIT = 200;
-let totalPostsCount = null; // jumlah SEMUA post di database (bukan cuma yang tampil)
+let totalPostsCount = null;
 let totalCountSeq = 0;
 let searchActive = false;
 const MAIN_FEED_LIMIT = 50;
 
-// === Konfigurasi slot iklan native ===
-const ADS_EVERY_N_POSTS = 4; // sisipkan 1 slot iklan tiap 4 post
-
-// Zona iklan atOptions (dari dashboard ad network).
-// Masing-masing dijalankan di dalam iframe terisolasi (srcdoc) supaya:
-// 1) variabel global "atOptions" antar-zona tidak saling menimpa
-// 2) auto-redirect/popup dari script iklan tidak bisa keluar dari kotaknya
-//    (sandbox hanya mengizinkan klik manual, bukan redirect paksa)
+const ADS_EVERY_N_POSTS = 4;
 const ADS_ZONE_SQUARE = { key: "8eb886ab4511979ddc3b249d33e34725", width: 300, height: 250 };
 const ADS_ZONE_LEADERBOARD = { key: "c815dc8b1442b1b2e98cf2ac0376024c", width: 320, height: 50 };
 
@@ -72,10 +55,6 @@ function buildAdsIframe(zone) {
   iframe.height = String(zone.height);
   iframe.scrolling = "no";
   iframe.loading = "lazy";
-  // allow-scripts + allow-same-origin: iklan butuh JS untuk render.
-  // allow-popups-to-escape-sandbox + allow-top-navigation-by-user-activation:
-  // klik manual pengguna tetap bisa membuka tab/link tujuan iklan,
-  // TAPI script tidak bisa memicu redirect/popup otomatis tanpa klik.
   iframe.sandbox = "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation";
   iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{margin:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}</style></head><body>
     <script>
@@ -102,58 +81,69 @@ function createAdsSlot(zone, showLabel) {
 
 document.getElementById("headerAdsSlot").appendChild(buildAdsIframe(ADS_ZONE_LEADERBOARD));
 
-/* ================== DOMAIN LINK EMBED (settings/linkDomain) ==================
-   Mendukung BANYAK domain sumber yang semuanya diarahkan ke satu domain tujuan.
-   - activeLinkDomainTarget : domain tujuan (misal: https://domain-baru.com)
-   - activeLinkDomainSources: array domain sumber [https://A.com, https://B.com, ...]
-   
-   Logika penggantian:
-   - URL yang host-nya ada di daftar sumber → host diganti ke target
-   - URL yang host-nya TIDAK ada di daftar sumber → tetap jalan apa adanya
-   - Target kosong atau sumber kosong → semua URL tetap apa adanya
+/* ================== DOMAIN LINK EMBED — SISTEM GRUP ==================
+   Mendukung banyak grup mapping domain, masing-masing punya:
+   - target  : domain tujuan (misal: https://vidara-baru.com)
+   - sources : array domain sumber (misal: ["https://A.com", "https://B.com"])
 
-   Data dimuat SEBELUM post mana pun dirender supaya tidak ada link yang
-   sempat tampil dengan domain lama.
-   
-   Kompatibilitas mundur: field "domain" lama (sebelum migrasi ke multi-domain)
-   masih terbaca sebagai target via fallback. */
-let activeLinkDomainTarget = null;
-let activeLinkDomainSources = [];
+   Cara kerja saat render link:
+   1. Cek host URL link di setiap grup.sources
+   2. Kalau cocok → ganti host dengan grup.target
+   3. Kalau tidak cocok di grup mana pun → URL tetap jalan apa adanya
+
+   Dengan begini setiap platform hosting bisa punya jalur sendiri:
+   - Grup 1: Vidara  (sumber A,B,C → tujuan D)
+   - Grup 2: Vimeo   (sumber E,F   → tujuan G)
+   - Grup 3: dst...
+
+   Kompatibilitas mundur: format lama ({ target, sources }) tanpa array groups
+   masih terbaca sebagai satu grup. */
+
+let activeDomainGroups = []; // [{ target: "https://...", sources: ["https://...", ...] }]
 
 function replaceEmbedDomain(originalUrl) {
-  if (!activeLinkDomainTarget || activeLinkDomainSources.length === 0) return originalUrl;
+  if (activeDomainGroups.length === 0) return originalUrl;
   try {
     const url = new URL(originalUrl);
-    // Cek apakah host URL ini termasuk salah satu domain sumber
-    const matched = activeLinkDomainSources.some((src) => {
-      try { return new URL(src).host === url.host; } catch (e) { return false; }
-    });
-    if (!matched) return originalUrl; // domain tidak terdaftar → tetap jalan
-    const target = new URL(activeLinkDomainTarget);
-    url.protocol = target.protocol;
-    url.host = target.host;
-    return url.toString();
+    for (const group of activeDomainGroups) {
+      if (!group.target || !Array.isArray(group.sources) || group.sources.length === 0) continue;
+      const matched = group.sources.some((src) => {
+        try { return new URL(src).host === url.host; } catch (e) { return false; }
+      });
+      if (matched) {
+        const target = new URL(group.target);
+        url.protocol = target.protocol;
+        url.host = target.host;
+        return url.toString();
+      }
+    }
+    return originalUrl; // tidak cocok grup mana pun → tetap jalan
   } catch (err) {
-    return originalUrl; // kalau URL tidak valid, pakai link asli
+    return originalUrl;
   }
 }
 
 async function loadLinkDomainSetting() {
   try {
     const snap = await getDoc(doc(db, "settings", "linkDomain"));
-    if (snap.exists()) {
-      const data = snap.data();
-      // Kompatibilitas mundur: field "domain" lama → target
-      activeLinkDomainTarget = data.target || data.domain || null;
-      activeLinkDomainSources = Array.isArray(data.sources) ? data.sources : [];
+    if (!snap.exists()) { activeDomainGroups = []; return; }
+    const data = snap.data();
+
+    if (Array.isArray(data.groups)) {
+      // Format baru: array of groups
+      activeDomainGroups = data.groups.filter(g => g.target && Array.isArray(g.sources));
+    } else if (data.target || data.domain) {
+      // Format lama (sebelum sistem grup) → jadikan satu grup
+      activeDomainGroups = [{
+        target: data.target || data.domain,
+        sources: Array.isArray(data.sources) ? data.sources : []
+      }];
     } else {
-      activeLinkDomainTarget = null;
-      activeLinkDomainSources = [];
+      activeDomainGroups = [];
     }
   } catch (err) {
     console.error("Gagal memuat pengaturan domain link:", err);
-    activeLinkDomainTarget = null;
-    activeLinkDomainSources = [];
+    activeDomainGroups = [];
   }
 }
 
@@ -167,11 +157,7 @@ async function loadLinkDomainSetting() {
   renderMain(postId);
 })();
 
-/* ================== SLOT LINK FLEKSIBEL (3 slot, diisi dari dasbor) ==================
-   Data di Firestore: settings/chipbar -> chip{1..3}Name / chip{1..3}Link /
-   chip{1..3}Active. Tampil sebagai deret tab kecil di bawah tombol link setiap
-   post. Setiap post punya "slot" kosong (.post-chip-slot) yang diisi belakangan,
-   jadi tetap muncul walau datanya baru selesai dimuat setelah post dirender. */
+/* ================== SLOT LINK FLEKSIBEL ================== */
 let postChipBarHtml = "";
 
 const playIconSvg = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" style="flex-shrink:0;"><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.18"/><path d="M10 8.3v7.4c0 .6.65 1 1.2.68l6.1-3.7c.55-.33.55-1.1 0-1.44l-6.1-3.7c-.55-.34-1.2.06-1.2.66z" fill="currentColor"/></svg>`;
@@ -180,7 +166,6 @@ function escapeHtmlAttr(str) {
   return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
-// Hanya link http/https yang boleh jadi tab (menolak javascript: dsb).
 function safeHttpUrl(url) {
   try {
     const u = new URL(String(url).trim());
@@ -215,16 +200,7 @@ async function loadCustomChipBar() {
   }
 }
 
-/* ================== INDEKS TAG LENGKAP (settings/tagIndex) ==================
-   Bar tag & saran pencarian SEBELUMNYA cuma mengambil tag dari 200 post
-   terbaru (allDocsCache) -- tag yang cuma dipakai di post lama/jarang tidak
-   pernah muncul. Tag itu detail yang harus lengkap menyeluruh berapa pun
-   kecil pemakaiannya, jadi sekarang dibaca dari satu dokumen ringkas yang
-   menyimpan SEMUA tag yang pernah dipakai (ditambahkan otomatis dari admin.js
-   setiap kali post baru/diedit menyertakan tag baru). Dokumen ini hanya
-   BERTAMBAH isinya -- tag yang sudah tidak dipakai post mana pun tetap
-   tercatat di sini (tetap aman diklik, cuma akan menampilkan "belum ada
-   konten dengan tag ini" kalau memang sudah tidak ada post yang memakainya). */
+/* ================== INDEKS TAG ================== */
 let allTagsCache = [];
 
 async function loadAllTagsIndex() {
@@ -260,10 +236,6 @@ async function loadContactBar() {
   }
 }
 
-// Total post di database. Selama jumlahnya di bawah batas listener (200),
-// cukup pakai ukuran snapshot (realtime, langsung berkurang saat ada yang
-// dihapus). Kalau sudah menyentuh batas, hitung ke server supaya angkanya
-// tetap akurat dan tidak mentok di 200.
 async function refreshTotalCount(snapshot) {
   const seq = ++totalCountSeq;
   let count = snapshot.size;
@@ -275,7 +247,7 @@ async function refreshTotalCount(snapshot) {
       console.error("Gagal menghitung total post:", err);
     }
   }
-  if (seq !== totalCountSeq) return; // ada pembaruan yang lebih baru
+  if (seq !== totalCountSeq) return;
   totalPostsCount = count;
   renderFeedMeta();
 }
@@ -318,30 +290,15 @@ function renderCategoryBar() {
 function renderOldPostsRotation() {
   const wrap = document.getElementById("oldRotationWrap");
   if (!wrap) return;
-
-  // Rotasi cuma tampil di halaman utama, bukan di mode post/tag
-  if (shortCode || postIdParam || tagParam) {
-    wrap.innerHTML = "";
-    return;
-  }
+  if (shortCode || postIdParam || tagParam) { wrap.innerHTML = ""; return; }
 
   const pool = allDocsCache.slice(MAIN_FEED_LIMIT);
-  if (pool.length === 0) {
-    wrap.innerHTML = "";
-    return;
-  }
+  if (pool.length === 0) { wrap.innerHTML = ""; return; }
 
   const today = new Date().toISOString().slice(0, 10);
   let saved = null;
-  try {
-    saved = JSON.parse(localStorage.getItem("oldPostsRotation") || "null");
-  } catch (err) {
-    saved = null;
-  }
+  try { saved = JSON.parse(localStorage.getItem("oldPostsRotation") || "null"); } catch (err) { saved = null; }
 
-  // Rotasi harian yang tersimpan hanya dipakai kalau SEMUA post di dalamnya
-  // masih ada di database (belum dihapus / belum bergeser ke feed utama).
-  // Kalau ada yang sudah hilang, diacak ulang supaya tampilan selalu sinkron.
   const wantedCount = Math.min(3, pool.length);
   const savedStillValid =
     saved && saved.date === today && Array.isArray(saved.ids) &&
@@ -354,17 +311,10 @@ function renderOldPostsRotation() {
   } else {
     const shuffled = [...pool].sort(() => Math.random() - 0.5);
     chosenIds = shuffled.slice(0, 3).map((d) => d.id);
-    try {
-      localStorage.setItem("oldPostsRotation", JSON.stringify({ date: today, ids: chosenIds }));
-    } catch (err) {
-      // localStorage tidak tersedia, lewati saja
-    }
+    try { localStorage.setItem("oldPostsRotation", JSON.stringify({ date: today, ids: chosenIds })); } catch (err) {}
   }
 
-  const chosenDocs = chosenIds
-    .map((id) => pool.find((d) => d.id === id))
-    .filter(Boolean);
-
+  const chosenDocs = chosenIds.map((id) => pool.find((d) => d.id === id)).filter(Boolean);
   wrap.innerHTML = "";
   if (chosenDocs.length === 0) return;
 
@@ -384,57 +334,39 @@ function setupSearch() {
   input.addEventListener("input", (e) => {
     const qText = e.target.value.trim().toLowerCase();
     clearBtn.style.display = e.target.value ? "block" : "none";
-
     if (!qText) {
       suggestBox.classList.remove("show");
       suggestBox.innerHTML = "";
-      if (searchActive) {
-        searchActive = false;
-        location.reload();
-      }
+      if (searchActive) { searchActive = false; location.reload(); }
       return;
     }
-
     renderSuggestions(qText);
   });
 
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      runFullSearch(input.value.trim());
-    }
+    if (e.key === "Enter") { e.preventDefault(); runFullSearch(input.value.trim()); }
   });
 
-  btn.addEventListener("click", () => {
-    runFullSearch(input.value.trim());
-  });
+  btn.addEventListener("click", () => { runFullSearch(input.value.trim()); });
 
   clearBtn.addEventListener("click", () => {
     input.value = "";
     clearBtn.style.display = "none";
     suggestBox.classList.remove("show");
     suggestBox.innerHTML = "";
-    if (searchActive) {
-      searchActive = false;
-      location.reload();
-    }
+    if (searchActive) { searchActive = false; location.reload(); }
     input.focus();
   });
 
   document.addEventListener("click", (e) => {
-    if (!suggestBox.contains(e.target) && e.target !== input) {
-      suggestBox.classList.remove("show");
-    }
+    if (!suggestBox.contains(e.target) && e.target !== input) suggestBox.classList.remove("show");
   });
 }
 
 function renderSuggestions(qText) {
   const suggestBox = document.getElementById("searchSuggestions");
-  // Tag: dicocokkan dari indeks LENGKAP (allTagsCache), bukan cuma post yang
-  // kebetulan ke-cache -- sekecil apa pun pemakaiannya, tetap ketemu di sini.
   const matchedTags = allTagsCache.filter((t) => t.toLowerCase().includes(qText));
   const matchedPosts = [];
-
   allDocsCache.forEach((docSnap) => {
     const data = docSnap.data();
     if (data.caption && data.caption.toLowerCase().includes(qText)) {
@@ -450,10 +382,7 @@ function renderSuggestions(qText) {
     const href = p.code ? `/p/${p.code}` : `?post=${p.id}`;
     html += `<a class="search-suggestion-item" href="${href}"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg> ${escapeHtml(p.caption)}</a>`;
   });
-
-  if (!html) {
-    html = `<div class="search-suggestion-item" style="color:#999;">Tidak ada saran</div>`;
-  }
+  if (!html) html = `<div class="search-suggestion-item" style="color:#999;">Tidak ada saran</div>`;
 
   suggestBox.innerHTML = html;
   suggestBox.classList.add("show");
@@ -463,12 +392,7 @@ function runFullSearch(qTextRaw) {
   const suggestBox = document.getElementById("searchSuggestions");
   suggestBox.classList.remove("show");
   const qText = qTextRaw.toLowerCase();
-
-  if (!qText) {
-    searchActive = false;
-    location.reload();
-    return;
-  }
+  if (!qText) { searchActive = false; location.reload(); return; }
 
   searchActive = true;
   renderFeedMeta();
@@ -518,10 +442,7 @@ function renderPost(docSnap) {
     .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${escapeHtmlAttr(replaceEmbedDomain(l.url))}" target="_blank" rel="noopener noreferrer">${playIconSvg} ${escapeHtml(l.label)}</a>`)
     .join("");
 
-  const caption = data.caption
-    ? `<div class="post-caption">${escapeHtml(data.caption)}</div>`
-    : "";
-
+  const caption = data.caption ? `<div class="post-caption">${escapeHtml(data.caption)}</div>` : "";
   const tagsList = data.tags || [];
   const tagsHtml = tagsList.length
     ? `<div class="post-tags">${tagsList.map(t => `<a class="tag-chip" href="?tag=${encodeURIComponent(t)}">${escapeHtml(t.replace(/^#+/, ""))}</a>`).join("")}</div>`
@@ -545,11 +466,6 @@ function renderPost(docSnap) {
 
   fillChipSlots(post);
 
-  // Hitung setiap klik tombol link (video/konten) -- dikirim ke Firestore
-  // sebagai field "linkClicks" di post ini, TANPA menahan navigasi (link tetap
-  // target="_blank" dan langsung terbuka; hitungannya jalan di belakang
-  // layar). Ini beda dari "postViews" (jumlah post/gambarnya DIBUKA/DILIHAT,
-  // lihat renderMain di bawah) -- keduanya muncul terpisah di dasbor admin.
   post.querySelectorAll(".post-link[data-link-idx]").forEach((linkEl) => {
     linkEl.addEventListener("click", () => {
       updateDoc(doc(db, "posts", docSnap.id), { linkClicks: increment(1) }).catch((err) => {
@@ -562,141 +478,121 @@ function renderPost(docSnap) {
 }
 
 function renderMain(postId) {
-if (postId) {
-  getDoc(doc(db, "posts", postId)).then((docSnap) => {
-    if (!docSnap.exists()) {
-      postsEl.innerHTML = '<p class="empty">Materi tidak ditemukan.</p>';
-      return;
-    }
-    postsEl.innerHTML = "";
-    postsEl.appendChild(renderPost(docSnap));
-
-    // Post ini dibuka lewat link-nya sendiri (/p/kode atau ?post=id) --
-    // dihitung sebagai satu "view" (post/gambarnya benar-benar dilihat),
-    // beda dari "linkClicks" (klik tombol link video di dalam post).
-    updateDoc(doc(db, "posts", postId), { postViews: increment(1) }).catch((err) => {
-      console.error("Gagal mencatat view post:", err);
-    });
-
-    // Bar konten lainnya, live update, di bawah post yang dibagikan
-    const otherWrap = document.createElement("div");
-    otherWrap.id = "otherPosts";
-    postsEl.appendChild(otherWrap);
-
-    const qOthers = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(10));
-    onSnapshot(qOthers, (snapshot) => {
-      const others = snapshot.docs.filter(d => d.id !== postId);
-      if (others.length === 0) {
-        otherWrap.innerHTML = "";
+  if (postId) {
+    getDoc(doc(db, "posts", postId)).then((docSnap) => {
+      if (!docSnap.exists()) {
+        postsEl.innerHTML = '<p class="empty">Materi tidak ditemukan.</p>';
         return;
       }
-      otherWrap.innerHTML = "";
-      const title = document.createElement("div");
-      title.className = "section-title";
-      title.textContent = "Konten Lainnya";
-      otherWrap.appendChild(title);
-      others.forEach((d, idx) => {
-        otherWrap.appendChild(renderPost(d));
-        if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== others.length - 1) {
-          otherWrap.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
-        }
+      postsEl.innerHTML = "";
+      postsEl.appendChild(renderPost(docSnap));
+
+      updateDoc(doc(db, "posts", postId), { postViews: increment(1) }).catch((err) => {
+        console.error("Gagal mencatat view post:", err);
       });
+
+      const otherWrap = document.createElement("div");
+      otherWrap.id = "otherPosts";
+      postsEl.appendChild(otherWrap);
+
+      const qOthers = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(10));
+      onSnapshot(qOthers, (snapshot) => {
+        const others = snapshot.docs.filter(d => d.id !== postId);
+        if (others.length === 0) { otherWrap.innerHTML = ""; return; }
+        otherWrap.innerHTML = "";
+        const title = document.createElement("div");
+        title.className = "section-title";
+        title.textContent = "Konten Lainnya";
+        otherWrap.appendChild(title);
+        others.forEach((d, idx) => {
+          otherWrap.appendChild(renderPost(d));
+          if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== others.length - 1) {
+            otherWrap.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+          }
+        });
+        const seeAll = document.createElement("a");
+        seeAll.className = "post-link";
+        seeAll.href = window.location.origin + "/";
+        seeAll.innerHTML = `<svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg> Lihat Semua Konten`;
+        otherWrap.appendChild(seeAll);
+      });
+    }).catch(() => {
+      postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>';
+    });
+  } else if (tagParam) {
+    const qTag = query(collection(db, "posts"), where("tags", "array-contains", tagParam), orderBy("createdAt", "desc"));
+    onSnapshot(qTag, (snapshot) => {
+      if (searchActive) return;
+      postsEl.innerHTML = "";
+      const header = document.createElement("div");
+      header.className = "section-title";
+      header.textContent = `Tag: ${tagParam} · ${snapshot.size} konten`;
+      postsEl.appendChild(header);
+
+      if (snapshot.empty) {
+        const empty = document.createElement("p");
+        empty.className = "empty";
+        empty.textContent = "Belum ada konten dengan tag ini.";
+        postsEl.appendChild(empty);
+      } else {
+        const docs = snapshot.docs;
+        docs.forEach((d, idx) => {
+          postsEl.appendChild(renderPost(d));
+          if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== docs.length - 1) {
+            postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+          }
+        });
+      }
 
       const seeAll = document.createElement("a");
       seeAll.className = "post-link";
       seeAll.href = window.location.origin + "/";
       seeAll.innerHTML = `<svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg> Lihat Semua Konten`;
-      otherWrap.appendChild(seeAll);
+      postsEl.appendChild(seeAll);
     });
-  }).catch(() => {
-    postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>';
-  });
-} else if (tagParam) {
-  const qTag = query(collection(db, "posts"), where("tags", "array-contains", tagParam), orderBy("createdAt", "desc"));
-  onSnapshot(qTag, (snapshot) => {
-    if (searchActive) return;
-    postsEl.innerHTML = "";
-    const header = document.createElement("div");
-    header.className = "section-title";
-    header.textContent = `Tag: ${tagParam} · ${snapshot.size} konten`;
-    postsEl.appendChild(header);
+  } else {
+    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(MAIN_FEED_LIMIT));
+    onSnapshot(q, (snapshot) => {
+      if (searchActive) return;
+      if (snapshot.empty) { postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>'; return; }
 
-    if (snapshot.empty) {
-      const empty = document.createElement("p");
-      empty.className = "empty";
-      empty.textContent = "Belum ada konten dengan tag ini.";
-      postsEl.appendChild(empty);
-    } else {
-      const docs = snapshot.docs;
-      docs.forEach((d, idx) => {
-        postsEl.appendChild(renderPost(d));
-        if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== docs.length - 1) {
-          postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
-        }
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const sevenDaysAgo = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+      const groups = { hariIni: [], mingguIni: [], lebihLama: [] };
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const created = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+        if (created && created >= startOfToday) groups.hariIni.push(docSnap);
+        else if (created && created >= sevenDaysAgo) groups.mingguIni.push(docSnap);
+        else groups.lebihLama.push(docSnap);
       });
-    }
 
-    const seeAll = document.createElement("a");
-    seeAll.className = "post-link";
-    seeAll.href = window.location.origin + "/";
-    seeAll.innerHTML = `<svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg> Lihat Semua Konten`;
-    postsEl.appendChild(seeAll);
-  });
-} else {
- 
-  const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(MAIN_FEED_LIMIT));
-  onSnapshot(q, (snapshot) => {
-    if (searchActive) return;
-    if (snapshot.empty) {
-      postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>';
-      return;
-    }
+      postsEl.innerHTML = "";
+      const sections = [
+        { key: "hariIni", label: "Hari Ini" },
+        { key: "mingguIni", label: "Minggu Ini" },
+        { key: "lebihLama", label: "Lebih Lama" }
+      ];
 
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const sevenDaysAgo = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
-
-    const groups = { hariIni: [], mingguIni: [], lebihLama: [] };
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const created = data.createdAt?.toDate ? data.createdAt.toDate() : null;
-      if (created && created >= startOfToday) {
-        groups.hariIni.push(docSnap);
-      } else if (created && created >= sevenDaysAgo) {
-        groups.mingguIni.push(docSnap);
-      } else {
-        groups.lebihLama.push(docSnap);
-      }
-    });
-
-    postsEl.innerHTML = "";
-    const sections = [
-      { key: "hariIni", label: "Hari Ini" },
-      { key: "mingguIni", label: "Minggu Ini" },
-      { key: "lebihLama", label: "Lebih Lama" }
-    ];
-
-    // Penghitung post lintas-section, supaya iklan tersebar rata
-    // sepanjang feed bukan cuma per-section.
-    let globalPostIdx = 0;
-
-    sections.forEach(({ key, label }) => {
-      if (groups[key].length === 0) return;
-      const title = document.createElement("div");
-      title.className = "section-title";
-      title.textContent = label;
-      postsEl.appendChild(title);
-      groups[key].forEach((docSnap) => {
-        postsEl.appendChild(renderPost(docSnap));
-        globalPostIdx += 1;
-        if (globalPostIdx % ADS_EVERY_N_POSTS === 0) {
-          postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
-        }
+      let globalPostIdx = 0;
+      sections.forEach(({ key, label }) => {
+        if (groups[key].length === 0) return;
+        const title = document.createElement("div");
+        title.className = "section-title";
+        title.textContent = label;
+        postsEl.appendChild(title);
+        groups[key].forEach((docSnap) => {
+          postsEl.appendChild(renderPost(docSnap));
+          globalPostIdx += 1;
+          if (globalPostIdx % ADS_EVERY_N_POSTS === 0) {
+            postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+          }
+        });
       });
     });
-  });
-}
+  }
 }
 
 function escapeHtml(str) {
@@ -712,20 +608,13 @@ window.openLightbox = function(url) {
 
 window.sharePost = async function(url) {
   const shareData = { url: url };
-
   if (navigator.share) {
-    try {
-      await navigator.share(shareData);
-    } catch (err) {
-      // Pengguna membatalkan share, tidak perlu ditampilkan sebagai error
-    }
+    try { await navigator.share(shareData); } catch (err) {}
   } else if (navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(url);
       alert("Link disalin! Silakan tempel ke aplikasi yang diinginkan.");
-    } catch (err) {
-      prompt("Salin link ini secara manual:", url);
-    }
+    } catch (err) { prompt("Salin link ini secara manual:", url); }
   } else {
     prompt("Salin link ini secara manual:", url);
   }
