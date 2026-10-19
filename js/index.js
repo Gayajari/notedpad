@@ -103,19 +103,35 @@ function createAdsSlot(zone, showLabel) {
 document.getElementById("headerAdsSlot").appendChild(buildAdsIframe(ADS_ZONE_LEADERBOARD));
 
 /* ================== DOMAIN LINK EMBED (settings/linkDomain) ==================
-   Kalau diisi dari dasbor admin, host SEMUA link embed di post ditimpa
-   dengan domain ini saat render -- path/query string link asli tetap sama,
-   data di Firestore juga tidak diubah. Dimuat SEBELUM post mana pun
-   dirender supaya tidak ada link yang sempat tampil dengan domain lama. */
-let activeLinkDomain = null;
+   Mendukung BANYAK domain sumber yang semuanya diarahkan ke satu domain tujuan.
+   - activeLinkDomainTarget : domain tujuan (misal: https://domain-baru.com)
+   - activeLinkDomainSources: array domain sumber [https://A.com, https://B.com, ...]
+   
+   Logika penggantian:
+   - URL yang host-nya ada di daftar sumber → host diganti ke target
+   - URL yang host-nya TIDAK ada di daftar sumber → tetap jalan apa adanya
+   - Target kosong atau sumber kosong → semua URL tetap apa adanya
 
-function replaceEmbedDomain(originalUrl, newDomain) {
-  if (!newDomain) return originalUrl;
+   Data dimuat SEBELUM post mana pun dirender supaya tidak ada link yang
+   sempat tampil dengan domain lama.
+   
+   Kompatibilitas mundur: field "domain" lama (sebelum migrasi ke multi-domain)
+   masih terbaca sebagai target via fallback. */
+let activeLinkDomainTarget = null;
+let activeLinkDomainSources = [];
+
+function replaceEmbedDomain(originalUrl) {
+  if (!activeLinkDomainTarget || activeLinkDomainSources.length === 0) return originalUrl;
   try {
     const url = new URL(originalUrl);
-    const base = new URL(newDomain);
-    url.protocol = base.protocol;
-    url.host = base.host;
+    // Cek apakah host URL ini termasuk salah satu domain sumber
+    const matched = activeLinkDomainSources.some((src) => {
+      try { return new URL(src).host === url.host; } catch (e) { return false; }
+    });
+    if (!matched) return originalUrl; // domain tidak terdaftar → tetap jalan
+    const target = new URL(activeLinkDomainTarget);
+    url.protocol = target.protocol;
+    url.host = target.host;
     return url.toString();
   } catch (err) {
     return originalUrl; // kalau URL tidak valid, pakai link asli
@@ -125,10 +141,19 @@ function replaceEmbedDomain(originalUrl, newDomain) {
 async function loadLinkDomainSetting() {
   try {
     const snap = await getDoc(doc(db, "settings", "linkDomain"));
-    activeLinkDomain = snap.exists() ? (snap.data().domain || null) : null;
+    if (snap.exists()) {
+      const data = snap.data();
+      // Kompatibilitas mundur: field "domain" lama → target
+      activeLinkDomainTarget = data.target || data.domain || null;
+      activeLinkDomainSources = Array.isArray(data.sources) ? data.sources : [];
+    } else {
+      activeLinkDomainTarget = null;
+      activeLinkDomainSources = [];
+    }
   } catch (err) {
     console.error("Gagal memuat pengaturan domain link:", err);
-    activeLinkDomain = null;
+    activeLinkDomainTarget = null;
+    activeLinkDomainSources = [];
   }
 }
 
@@ -490,7 +515,7 @@ function renderPost(docSnap) {
 
   const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   const linkBtns = linksList
-    .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${escapeHtmlAttr(replaceEmbedDomain(l.url, activeLinkDomain))}" target="_blank" rel="noopener noreferrer">${playIconSvg} ${escapeHtml(l.label)}</a>`)
+    .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${escapeHtmlAttr(replaceEmbedDomain(l.url))}" target="_blank" rel="noopener noreferrer">${playIconSvg} ${escapeHtml(l.label)}</a>`)
     .join("");
 
   const caption = data.caption
