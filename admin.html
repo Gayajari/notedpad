@@ -79,10 +79,21 @@
     <svg class="icon accordion-arrow" id="linkDomainArrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
   </button>
   <div class="accordion-body" id="linkDomainBody">
-    <p style="font-size:12px; color:#888; margin:0 0 12px;">Kalau domain link embed berubah, cukup ganti di sini — berlaku otomatis untuk SEMUA konten tanpa edit link satu-satu. Kosongkan untuk pakai link asli apa adanya.</p>
-    <label>Domain Pengganti (contoh: https://embed-baru.com)</label>
-    <input type="url" id="linkDomainInput" placeholder="https://domain-baru.com">
-    <button id="saveLinkDomainBtn">Simpan Domain</button>
+    <p style="font-size:12px; color:#888; margin:0 0 12px;">
+      Daftarkan domain sumber yang ingin diganti, lalu isi domain tujuan.
+      Domain lain yang <b>tidak</b> ada di daftar sumber tetap jalan apa adanya.
+      Kosongkan domain tujuan untuk menonaktifkan penggantian.
+    </p>
+
+    <label>Domain Tujuan (semua domain sumber akan diarahkan ke sini)</label>
+    <input type="url" id="linkDomainTarget" placeholder="https://domain-baru.com">
+
+    <label style="margin-top:16px;">Domain Sumber</label>
+    <p style="font-size:12px; color:#888; margin:0 0 8px;">Tambahkan semua domain lama yang ingin dialihkan. Klik <b>+</b> untuk menambah, <b>✕</b> untuk menghapus.</p>
+    <div id="linkDomainSourcesList"></div>
+    <button type="button" id="addSourceDomainBtn" style="margin-top:8px; width:auto; padding:8px 14px; font-size:13px;">+ Tambah Domain Sumber</button>
+
+    <button id="saveLinkDomainBtn" style="margin-top:16px;">Simpan Domain</button>
     <div class="msg" id="linkDomainMsg"></div>
   </div>
 </div>
