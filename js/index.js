@@ -102,10 +102,45 @@ function createAdsSlot(zone, showLabel) {
 
 document.getElementById("headerAdsSlot").appendChild(buildAdsIframe(ADS_ZONE_LEADERBOARD));
 
-loadContactBar();
-loadCustomChipBar();
-loadCategoryBar();
-setupSearch();
+/* ================== DOMAIN LINK EMBED (settings/linkDomain) ==================
+   Kalau diisi dari dasbor admin, host SEMUA link embed di post ditimpa
+   dengan domain ini saat render -- path/query string link asli tetap sama,
+   data di Firestore juga tidak diubah. Dimuat SEBELUM post mana pun
+   dirender supaya tidak ada link yang sempat tampil dengan domain lama. */
+let activeLinkDomain = null;
+
+function replaceEmbedDomain(originalUrl, newDomain) {
+  if (!newDomain) return originalUrl;
+  try {
+    const url = new URL(originalUrl);
+    const base = new URL(newDomain);
+    url.protocol = base.protocol;
+    url.host = base.host;
+    return url.toString();
+  } catch (err) {
+    return originalUrl; // kalau URL tidak valid, pakai link asli
+  }
+}
+
+async function loadLinkDomainSetting() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "linkDomain"));
+    activeLinkDomain = snap.exists() ? (snap.data().domain || null) : null;
+  } catch (err) {
+    console.error("Gagal memuat pengaturan domain link:", err);
+    activeLinkDomain = null;
+  }
+}
+
+(async () => {
+  await loadLinkDomainSetting();
+  loadContactBar();
+  loadCustomChipBar();
+  loadCategoryBar();
+  setupSearch();
+  const postId = await resolvePostId();
+  renderMain(postId);
+})();
 
 /* ================== SLOT LINK FLEKSIBEL (3 slot, diisi dari dasbor) ==================
    Data di Firestore: settings/chipbar -> chip{1..3}Name / chip{1..3}Link /
@@ -455,7 +490,7 @@ function renderPost(docSnap) {
 
   const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
   const linkBtns = linksList
-    .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${escapeHtmlAttr(l.url)}" target="_blank" rel="noopener noreferrer">${playIconSvg} ${escapeHtml(l.label)}</a>`)
+    .map((l, idx) => `<a class="post-link" data-link-idx="${idx}" href="${escapeHtmlAttr(replaceEmbedDomain(l.url, activeLinkDomain))}" target="_blank" rel="noopener noreferrer">${playIconSvg} ${escapeHtml(l.label)}</a>`)
     .join("");
 
   const caption = data.caption
@@ -500,8 +535,6 @@ function renderPost(docSnap) {
 
   return post;
 }
-
-resolvePostId().then((postId) => { renderMain(postId); });
 
 function renderMain(postId) {
 if (postId) {
