@@ -6,9 +6,152 @@
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=2">
 <title>Admin - Catatan Konten</title>
 <link rel="stylesheet" href="/css/admin.css">
+<style>
+  /* ===== STICKY PENGATURAN UTAMA ===== */
+  #settingsBar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #fff;
+    border-bottom: 1.5px solid #e8eaf6;
+    box-shadow: 0 2px 12px rgba(80,100,200,.07);
+    margin-bottom: 18px;
+  }
+
+  #settingsToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 14px 18px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    color: #2d3a6e;
+    gap: 10px;
+  }
+  #settingsToggle .toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #settingsToggle .arrow-icon {
+    transition: transform .22s;
+    flex-shrink: 0;
+    color: #9aa0c4;
+  }
+  #settingsToggle.open .arrow-icon {
+    transform: rotate(180deg);
+  }
+
+  #settingsBody {
+    display: none;
+    border-top: 1px solid #eef0fb;
+    max-height: 70vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  #settingsBody.open {
+    display: block;
+  }
+
+  /* Sub-accordion di dalam settings */
+  .sub-accordion-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 18px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #f0f2fb;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a5490;
+    gap: 8px;
+  }
+  .sub-accordion-toggle:hover { background: #f6f7fe; }
+  .sub-accordion-toggle .sub-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .sub-accordion-toggle .sub-arrow {
+    transition: transform .2s;
+    color: #b0b8e0;
+    flex-shrink: 0;
+  }
+  .sub-accordion-toggle.open .sub-arrow {
+    transform: rotate(180deg);
+  }
+
+  .sub-accordion-body {
+    display: none;
+    padding: 14px 18px 18px;
+    background: #fafbff;
+    border-bottom: 1px solid #eef0fb;
+  }
+  .sub-accordion-body.open {
+    display: block;
+  }
+
+  /* ===== Domain Grup ===== */
+  .domain-group {
+    border: 1px solid #e0e4ef;
+    border-radius: 10px;
+    padding: 14px 14px 10px;
+    margin-bottom: 12px;
+    background: #f8f9fd;
+  }
+  .domain-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .domain-group-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .domain-group-remove-btn {
+    background: none;
+    border: 1px solid #f1a0a0;
+    color: #d9534f;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: auto;
+    margin: 0;
+  }
+  .domain-group-remove-btn:hover { background: #fff0f0; }
+  .add-source-btn {
+    width: auto;
+    padding: 6px 12px;
+    font-size: 12px;
+    margin-top: 6px;
+    border-radius: 6px;
+  }
+  #addDomainGroupBtn {
+    width: 100%;
+    margin-top: 4px;
+    background: #f0f4ff;
+    color: #4a6cf7;
+    border: 1px dashed #b0bef7;
+    font-weight: 600;
+  }
+  #addDomainGroupBtn:hover { background: #e6ecff; }
+</style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div class="card" id="loginCard">
   <h2><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Login</h2>
   <label>Email</label>
@@ -19,83 +162,99 @@
   <div class="msg error" id="loginMsg"></div>
 </div>
 
-<div class="card" id="contactCard" style="display:none;">
-  <button type="button" class="accordion-toggle" id="contactToggle">
-    <span class="accordion-label"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>Pengaturan Link Sosmed</span>
-    <svg class="icon accordion-arrow" id="contactArrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+<!-- STICKY PENGATURAN UTAMA -->
+<div id="settingsBar" style="display:none;">
+  <button type="button" id="settingsToggle">
+    <span class="toggle-left">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      Pengaturan Utama
+    </span>
+    <svg class="icon arrow-icon" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
   </button>
-  <div class="accordion-body" id="contactBody">
-    <label>Link Telegram (kosongkan jika tidak dipakai)</label>
-    <input type="url" id="contactTelegram" placeholder="https://t.me/namagrup">
-    <label>Link Tutorial (kosongkan jika tidak dipakai)</label>
-    <input type="url" id="contactFacebook" placeholder="https://Tutorial.com/xxxx">
-    <label>Link WhatsApp (kosongkan jika tidak dipakai)</label>
-    <input type="url" id="contactWhatsapp" placeholder="https://chat.whatsapp.com/xxxx">
-    <button id="saveContactBtn">Simpan Pengaturan</button>
-    <div class="msg" id="contactMsg"></div>
-  </div>
-</div>
 
-<div class="card" id="chipBarCard" style="display:none;">
-  <button type="button" class="accordion-toggle" id="chipBarToggle">
-    <span class="accordion-label"><svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4A2 2 0 0 1 2 11V4a2 2 0 0 1 2-2h7a2 2 0 0 1 1.41.59l8.18 8.18a2 2 0 0 1 0 2.83Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>Slot Link Fleksibel (3 Slot)</span>
-    <svg class="icon accordion-arrow" id="chipBarArrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-  </button>
-  <div class="accordion-body" id="chipBarBody">
-    <p style="font-size:12px; color:#888; margin:0 0 12px;">Tab link kecil yang muncul di setiap post, tepat di bawah tombol link. Kosongkan nama &amp; link kalau slot tidak dipakai. Tab hanya tampil kalau nama + link terisi dan statusnya Aktif.</p>
+  <div id="settingsBody">
 
-    <label>Slot 1 — Nama Tab</label>
-    <input type="text" id="chip1Name" placeholder="misal: Grup Bonus">
-    <label>Slot 1 — Link</label>
-    <input type="url" id="chip1Link" placeholder="https://...">
-    <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:500;">
-      <input type="checkbox" id="chip1Active" style="width:auto;" checked> Aktif
-    </label>
-
-    <label style="margin-top:16px;">Slot 2 — Nama Tab</label>
-    <input type="text" id="chip2Name" placeholder="misal: Promo Terbaru">
-    <label>Slot 2 — Link</label>
-    <input type="url" id="chip2Link" placeholder="https://...">
-    <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:500;">
-      <input type="checkbox" id="chip2Active" style="width:auto;" checked> Aktif
-    </label>
-
-    <label style="margin-top:16px;">Slot 3 — Nama Tab</label>
-    <input type="text" id="chip3Name" placeholder="misal: Channel Utama">
-    <label>Slot 3 — Link</label>
-    <input type="url" id="chip3Link" placeholder="https://...">
-    <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-weight:500;">
-      <input type="checkbox" id="chip3Active" style="width:auto;" checked> Aktif
-    </label>
-
-    <button id="saveChipBarBtn" style="margin-top:16px;">Simpan Slot Link</button>
-    <div class="msg" id="chipBarMsg"></div>
-  </div>
-</div>
-
-<div class="card" id="linkDomainCard" style="display:none;">
-  <button type="button" class="accordion-toggle" id="linkDomainToggle">
-    <span class="accordion-label"><svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>Domain Link Embed</span>
-    <svg class="icon accordion-arrow" id="linkDomainArrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
-  </button>
-  <div class="accordion-body" id="linkDomainBody">
-    <p style="font-size:12px; color:#888; margin:0 0 14px;">
-      Setiap <b>platform video hosting</b> punya grupnya sendiri. Isi domain tujuan platform tersebut, lalu daftarkan semua domain sumber lama yang ingin dialihkan ke sana.<br>
-      Domain yang tidak masuk daftar mana pun tetap jalan apa adanya.
-    </p>
-
-    <!-- Grup-grup platform dirender oleh JS di sini -->
-    <div id="linkDomainGroupsContainer"></div>
-
-    <button type="button" id="addDomainGroupBtn" style="margin-top:12px; width:100%;">
-      + Tambah Platform Baru
+    <!-- Sub: Link Sosmed -->
+    <button type="button" class="sub-accordion-toggle" id="contactToggle">
+      <span class="sub-left">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
+        Link Sosmed
+      </span>
+      <svg class="icon sub-arrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
     </button>
+    <div class="sub-accordion-body" id="contactBody">
+      <label>Link Telegram (kosongkan jika tidak dipakai)</label>
+      <input type="url" id="contactTelegram" placeholder="https://t.me/namagrup">
+      <label>Link Tutorial (kosongkan jika tidak dipakai)</label>
+      <input type="url" id="contactFacebook" placeholder="https://Tutorial.com/xxxx">
+      <label>Link WhatsApp (kosongkan jika tidak dipakai)</label>
+      <input type="url" id="contactWhatsapp" placeholder="https://chat.whatsapp.com/xxxx">
+      <button id="saveContactBtn" style="margin-top:10px;">Simpan Link Sosmed</button>
+      <div class="msg" id="contactMsg"></div>
+    </div>
 
-    <button id="saveLinkDomainBtn" style="margin-top:12px;">Simpan Semua Domain</button>
-    <div class="msg" id="linkDomainMsg"></div>
-  </div>
-</div>
+    <!-- Sub: Slot Link Fleksibel -->
+    <button type="button" class="sub-accordion-toggle" id="chipBarToggle">
+      <span class="sub-left">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4A2 2 0 0 1 2 11V4a2 2 0 0 1 2-2h7a2 2 0 0 1 1.41.59l8.18 8.18a2 2 0 0 1 0 2.83Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+        Slot Link Fleksibel (3 Slot)
+      </span>
+      <svg class="icon sub-arrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="sub-accordion-body" id="chipBarBody">
+      <p style="font-size:12px;color:#888;margin:0 0 12px;">Tab link kecil yang muncul di setiap post, tepat di bawah tombol link.</p>
 
+      <label>Slot 1 — Nama Tab</label>
+      <input type="text" id="chip1Name" placeholder="misal: Grup Bonus">
+      <label>Slot 1 — Link</label>
+      <input type="url" id="chip1Link" placeholder="https://...">
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;">
+        <input type="checkbox" id="chip1Active" style="width:auto;" checked> Aktif
+      </label>
+
+      <label style="margin-top:14px;">Slot 2 — Nama Tab</label>
+      <input type="text" id="chip2Name" placeholder="misal: Promo Terbaru">
+      <label>Slot 2 — Link</label>
+      <input type="url" id="chip2Link" placeholder="https://...">
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;">
+        <input type="checkbox" id="chip2Active" style="width:auto;" checked> Aktif
+      </label>
+
+      <label style="margin-top:14px;">Slot 3 — Nama Tab</label>
+      <input type="text" id="chip3Name" placeholder="misal: Channel Utama">
+      <label>Slot 3 — Link</label>
+      <input type="url" id="chip3Link" placeholder="https://...">
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;">
+        <input type="checkbox" id="chip3Active" style="width:auto;" checked> Aktif
+      </label>
+
+      <button id="saveChipBarBtn" style="margin-top:14px;">Simpan Slot Link</button>
+      <div class="msg" id="chipBarMsg"></div>
+    </div>
+
+    <!-- Sub: Domain Link Embed -->
+    <button type="button" class="sub-accordion-toggle" id="linkDomainToggle">
+      <span class="sub-left">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>
+        Domain Link Embed
+      </span>
+      <svg class="icon sub-arrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="sub-accordion-body" id="linkDomainBody">
+      <p style="font-size:12px;color:#888;margin:0 0 14px;">
+        Setiap platform hosting video punya grupnya sendiri. Satu grup = satu platform.<br>
+        Domain yang tidak terdaftar di grup mana pun tetap jalan apa adanya.
+      </p>
+      <div id="domainGroupsContainer"></div>
+      <button type="button" id="addDomainGroupBtn">+ Tambah Grup Platform</button>
+      <button id="saveLinkDomainBtn" style="margin-top:14px;">Simpan Semua Domain</button>
+      <div class="msg" id="linkDomainMsg"></div>
+    </div>
+
+  </div><!-- /settingsBody -->
+</div><!-- /settingsBar -->
+
+<!-- FORM TAMBAH/EDIT KONTEN -->
 <div class="card" id="formCard" style="display:none;">
   <h2><svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span id="formTitleText">Tambah Konten Baru</span></h2>
 
@@ -108,7 +267,7 @@
   <div id="linksContainer"></div>
   <button type="button" id="addLinkBtn">+ Tambah Link</button>
 
-  <label>Kategori/Tag (opsional, pisah dengan koma — misal: kuis, grammar)</label>
+  <label>Kategori/Tag (opsional, pisah dengan koma)</label>
   <input type="text" id="tags" placeholder="misal: kuis, grammar">
 
   <label>Catatan Judul (opsional)</label>
@@ -122,6 +281,7 @@
   <button id="logoutBtn">Keluar</button>
 </div>
 
+<!-- DAFTAR KONTEN -->
 <div class="card" id="listCard" style="display:none;">
   <h2><svg class="icon" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>Konten Tersimpan<span class="count-badge" id="totalPostCount">0</span></h2>
 
@@ -140,6 +300,7 @@
   <div id="postList"><p class="empty">Memuat...</p></div>
 </div>
 
+<!-- CROP MODAL -->
 <div class="crop-modal-overlay" id="cropModalOverlay">
   <div class="crop-modal-card">
     <button type="button" class="crop-close-btn" id="cropCloseBtn" title="Batal"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -176,6 +337,5 @@
 </div>
 
 <script type="module" src="/js/admin.js"></script>
-
 </body>
 </html>
