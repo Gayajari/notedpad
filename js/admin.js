@@ -53,11 +53,7 @@ async function deleteFromCloudflare(urls) {
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
       body: JSON.stringify({ urls: list })
     });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      console.error("Gagal menghapus foto dari Cloudflare R2:", data.error || res.status);
-      return false;
-    }
+    if (!res.ok) { const data = await res.json().catch(() => ({})); console.error("Gagal menghapus foto dari Cloudflare R2:", data.error || res.status); return false; }
     return true;
   } catch (err) {
     console.error("Gagal menghapus foto dari Cloudflare R2:", err);
@@ -81,17 +77,15 @@ async function generateUniqueCode() {
   throw new Error("Gagal membuat kode unik, coba lagi.");
 }
 
-const loginCard = document.getElementById("loginCard");
-const formCard = document.getElementById("formCard");
-const listCard = document.getElementById("listCard");
-const contactCard = document.getElementById("contactCard");
-const chipBarCard = document.getElementById("chipBarCard");
-const linkDomainCard = document.getElementById("linkDomainCard");
-const loginMsg = document.getElementById("loginMsg");
-const formMsg = document.getElementById("formMsg");
-const formTitle = document.getElementById("formTitleText");
-const submitBtn = document.getElementById("submitBtn");
-const cancelEditBtn = document.getElementById("cancelEditBtn");
+const loginCard   = document.getElementById("loginCard");
+const formCard    = document.getElementById("formCard");
+const listCard    = document.getElementById("listCard");
+const settingsBar = document.getElementById("settingsBar");
+const loginMsg    = document.getElementById("loginMsg");
+const formMsg     = document.getElementById("formMsg");
+const formTitle   = document.getElementById("formTitleText");
+const submitBtn   = document.getElementById("submitBtn");
+const cancelEditBtn   = document.getElementById("cancelEditBtn");
 const existingPreview = document.getElementById("existingPreview");
 
 let selectedFiles = [];
@@ -103,70 +97,76 @@ let removedExistingPhotos = [];
 onAuthStateChanged(auth, (user) => {
   if (user) {
     loginCard.style.display = "none";
+    settingsBar.style.display = "block";
     formCard.style.display = "block";
     listCard.style.display = "block";
-    contactCard.style.display = "block";
-    chipBarCard.style.display = "block";
-    linkDomainCard.style.display = "block";
     loadContactSettings();
     loadChipBarSettings();
     loadLinkDomainSettings();
     listenPosts();
   } else {
     loginCard.style.display = "block";
+    settingsBar.style.display = "none";
     formCard.style.display = "none";
     listCard.style.display = "none";
-    contactCard.style.display = "none";
-    chipBarCard.style.display = "none";
-    linkDomainCard.style.display = "none";
   }
 });
 
-function setupAccordion(toggleId, bodyId) {
-  const toggleBtn = document.getElementById(toggleId);
+/* ================== ACCORDION BERTINGKAT ==================
+   - #settingsToggle / #settingsBody  → sticky bar utama
+   - .sub-accordion-toggle / .sub-accordion-body → sub-section di dalamnya */
+
+// Sticky bar utama
+const settingsToggle = document.getElementById("settingsToggle");
+const settingsBody   = document.getElementById("settingsBody");
+settingsToggle.addEventListener("click", () => {
+  const willOpen = !settingsBody.classList.contains("open");
+  settingsBody.classList.toggle("open", willOpen);
+  settingsToggle.classList.toggle("open", willOpen);
+});
+
+// Sub-accordion (Link Sosmed, Slot Link, Domain)
+function setupSubAccordion(toggleId, bodyId) {
+  const btn  = document.getElementById(toggleId);
   const body = document.getElementById(bodyId);
-  if (!toggleBtn || !body) return;
-  toggleBtn.addEventListener("click", () => {
+  if (!btn || !body) return;
+  btn.addEventListener("click", () => {
     const willOpen = !body.classList.contains("open");
     body.classList.toggle("open", willOpen);
-    toggleBtn.classList.toggle("open", willOpen);
+    btn.classList.toggle("open", willOpen);
   });
 }
-setupAccordion("contactToggle", "contactBody");
-setupAccordion("chipBarToggle", "chipBarBody");
-setupAccordion("linkDomainToggle", "linkDomainBody");
+setupSubAccordion("contactToggle",    "contactBody");
+setupSubAccordion("chipBarToggle",    "chipBarBody");
+setupSubAccordion("linkDomainToggle", "linkDomainBody");
 
 document.getElementById("loginBtn").onclick = async () => {
   loginMsg.textContent = "";
-  const email = document.getElementById("email").value.trim();
+  const email    = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (err) {
-    loginMsg.textContent = "Login gagal: email/password salah.";
-  }
+  try { await signInWithEmailAndPassword(auth, email, password); }
+  catch (err) { loginMsg.textContent = "Login gagal: email/password salah."; }
 };
 
 document.getElementById("logoutBtn").onclick = () => signOut(auth);
 
-/* ================== CROP ENGINE ================== */
-const cropOverlay = document.getElementById("cropModalOverlay");
-const cropStage = document.getElementById("cropStage");
-const cropImgEl = document.getElementById("cropImg");
+// ================== CROPPER ==================
+const cropOverlay   = document.getElementById("cropModalOverlay");
+const cropStage     = document.getElementById("cropStage");
+const cropImgEl     = document.getElementById("cropImg");
 const cropZoomRange = document.getElementById("cropZoomRange");
 const cropAspectBar = document.getElementById("cropAspectBar");
-const cropCloseBtn = document.getElementById("cropCloseBtn");
+const cropCloseBtn  = document.getElementById("cropCloseBtn");
 const cropConfirmBtn = document.getElementById("cropConfirmBtn");
-const cropSwapBtn = document.getElementById("cropSwapBtn");
+const cropSwapBtn   = document.getElementById("cropSwapBtn");
 const cropSwapInput = document.getElementById("cropSwapInput");
 const CROP_STAGE_MAX_W = 360;
 
 let cropResolve = null, cropObjectUrl = null;
-let cropNaturalW = 0, cropNaturalH = 0, cropRatio = 0;
-let cropBaseScale = 1, cropScale = 1;
-let cropOffsetX = 0, cropOffsetY = 0;
-let cropDragging = false, cropDragStartX = 0, cropDragStartY = 0;
-let cropOffsetStartX = 0, cropOffsetStartY = 0;
+let cropNaturalW = 0, cropNaturalH = 0;
+let cropRatio = 0, cropBaseScale = 1, cropScale = 1;
+let cropOffsetX = 0, cropOffsetY = 0, cropDragging = false;
+let cropDragStartX = 0, cropDragStartY = 0, cropOffsetStartX = 0, cropOffsetStartY = 0;
 const cropActivePointers = new Map();
 let cropPinchStartDist = 0, cropPinchStartScale = 1;
 
@@ -192,29 +192,24 @@ function loadFileIntoCropper(file) {
 
 function setupCropStageSize() {
   const stageW = Math.min(CROP_STAGE_MAX_W, window.innerWidth - 64);
-  const ratio = cropRatio > 0 ? cropRatio : (cropNaturalW / cropNaturalH);
-  cropStage.style.width = stageW + "px";
+  const ratio  = cropRatio > 0 ? cropRatio : (cropNaturalW / cropNaturalH);
+  cropStage.style.width  = stageW + "px";
   cropStage.style.height = (stageW / ratio) + "px";
 }
 
 function resetCropTransform() {
   let stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
-  if (!stageW || !stageH) {
-    stageW = CROP_STAGE_MAX_W;
-    stageH = cropRatio > 0 ? stageW / cropRatio : stageW * (cropNaturalH / cropNaturalW);
-  }
+  if (!stageW || !stageH) { stageW = CROP_STAGE_MAX_W; stageH = cropRatio > 0 ? stageW / cropRatio : stageW * (cropNaturalH / cropNaturalW); }
   cropBaseScale = Math.max(stageW / cropNaturalW, stageH / cropNaturalH);
-  cropScale = cropBaseScale;
-  cropOffsetX = 0; cropOffsetY = 0;
+  cropScale = cropBaseScale; cropOffsetX = 0; cropOffsetY = 0;
   cropZoomRange.value = 100;
   applyCropTransform();
 }
 
 function clampCropOffsets() {
   const stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
-  const dispW = cropNaturalW * cropScale, dispH = cropNaturalH * cropScale;
-  const maxX = Math.max(0, (dispW - stageW) / 2);
-  const maxY = Math.max(0, (dispH - stageH) / 2);
+  const dispW  = cropNaturalW * cropScale, dispH = cropNaturalH * cropScale;
+  const maxX   = Math.max(0, (dispW - stageW) / 2), maxY = Math.max(0, (dispH - stageH) / 2);
   cropOffsetX = Math.min(maxX, Math.max(-maxX, cropOffsetX));
   cropOffsetY = Math.min(maxY, Math.max(-maxY, cropOffsetY));
 }
@@ -222,11 +217,10 @@ function clampCropOffsets() {
 function applyCropTransform() {
   clampCropOffsets();
   const stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
-  const dispW = cropNaturalW * cropScale, dispH = cropNaturalH * cropScale;
-  cropImgEl.style.width = dispW + "px";
-  cropImgEl.style.height = dispH + "px";
-  cropImgEl.style.left = ((stageW - dispW) / 2 + cropOffsetX) + "px";
-  cropImgEl.style.top = ((stageH - dispH) / 2 + cropOffsetY) + "px";
+  const dispW  = cropNaturalW * cropScale, dispH = cropNaturalH * cropScale;
+  cropImgEl.style.width  = dispW + "px"; cropImgEl.style.height = dispH + "px";
+  cropImgEl.style.left   = ((stageW - dispW) / 2 + cropOffsetX) + "px";
+  cropImgEl.style.top    = ((stageH - dispH) / 2 + cropOffsetY) + "px";
 }
 
 cropAspectBar.querySelectorAll(".crop-aspect-chip").forEach((btn) => {
@@ -234,8 +228,7 @@ cropAspectBar.querySelectorAll(".crop-aspect-chip").forEach((btn) => {
     cropAspectBar.querySelectorAll(".crop-aspect-chip").forEach((c) => c.classList.remove("active"));
     btn.classList.add("active");
     cropRatio = Number(btn.dataset.ratio);
-    setupCropStageSize();
-    resetCropTransform();
+    setupCropStageSize(); resetCropTransform();
   });
 });
 
@@ -254,7 +247,7 @@ function cropPointerDown(e) {
   } else if (cropActivePointers.size === 2) {
     cropDragging = false;
     const pts = Array.from(cropActivePointers.values());
-    cropPinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    cropPinchStartDist  = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     cropPinchStartScale = cropScale;
   }
 }
@@ -262,7 +255,7 @@ function cropPointerMove(e) {
   if (!cropActivePointers.has(e.pointerId)) return;
   cropActivePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (cropActivePointers.size === 2) {
-    const pts = Array.from(cropActivePointers.values());
+    const pts  = Array.from(cropActivePointers.values());
     const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
     if (cropPinchStartDist > 0) {
       cropScale = Math.min(cropBaseScale * 3, Math.max(cropBaseScale, cropPinchStartScale * (dist / cropPinchStartDist)));
@@ -280,9 +273,9 @@ function cropPointerUp(e) {
   if (cropActivePointers.size < 2) cropPinchStartDist = 0;
   if (cropActivePointers.size === 0) { cropDragging = false; cropStage.classList.remove("dragging"); }
 }
-cropStage.addEventListener("pointerdown", cropPointerDown);
-cropStage.addEventListener("pointermove", cropPointerMove);
-cropStage.addEventListener("pointerup", cropPointerUp);
+cropStage.addEventListener("pointerdown",  cropPointerDown);
+cropStage.addEventListener("pointermove",  cropPointerMove);
+cropStage.addEventListener("pointerup",    cropPointerUp);
 cropStage.addEventListener("pointercancel", cropPointerUp);
 cropStage.addEventListener("wheel", (e) => {
   e.preventDefault();
@@ -298,8 +291,9 @@ function closeCropModal(result) {
   const resolve = cropResolve; cropResolve = null;
   if (resolve) resolve(result);
 }
-cropCloseBtn.onclick = () => closeCropModal(null);
-cropSwapBtn.onclick = () => cropSwapInput.click();
+
+cropCloseBtn.onclick  = () => closeCropModal(null);
+cropSwapBtn.onclick   = () => cropSwapInput.click();
 cropSwapInput.addEventListener("change", () => {
   const file = cropSwapInput.files[0]; cropSwapInput.value = "";
   if (file) loadFileIntoCropper(file);
@@ -307,15 +301,13 @@ cropSwapInput.addEventListener("change", () => {
 
 cropConfirmBtn.onclick = () => {
   const stageW = cropStage.clientWidth, stageH = cropStage.clientHeight;
-  if (!stageW || !stageH || !cropScale || !cropNaturalW || !cropNaturalH) {
-    alert("Foto belum siap di-crop, coba tunggu sebentar lalu ulangi."); return;
-  }
+  if (!stageW || !stageH || !cropScale || !cropNaturalW || !cropNaturalH) { alert("Foto belum siap di-crop, coba tunggu sebentar lalu ulangi."); return; }
   const outW = 1080, outH = Math.round(outW * (stageH / stageW));
   const canvas = document.createElement("canvas");
   canvas.width = outW; canvas.height = outH;
   const ctx = canvas.getContext("2d");
   const renderScale = outW / stageW;
-  const dispW = cropNaturalW * cropScale * renderScale, dispH = cropNaturalH * cropScale * renderScale;
+  const dispW   = cropNaturalW * cropScale * renderScale, dispH = cropNaturalH * cropScale * renderScale;
   const centerX = outW / 2 + cropOffsetX * renderScale, centerY = outH / 2 + cropOffsetY * renderScale;
   ctx.drawImage(cropImgEl, centerX - dispW / 2, centerY - dispH / 2, dispW, dispH);
   canvas.toBlob((blob) => { closeCropModal(blob); }, "image/jpeg", 0.9);
@@ -327,7 +319,8 @@ function makeCroppedFile(blob, originalName) {
 }
 
 document.getElementById("photos").addEventListener("change", async (e) => {
-  const files = Array.from(e.target.files); e.target.value = "";
+  const files = Array.from(e.target.files);
+  e.target.value = "";
   for (const file of files) {
     const cropped = await openCropperForFile(file);
     if (cropped) { selectedFiles.push(makeCroppedFile(cropped, file.name)); renderNewPreview(); }
@@ -374,8 +367,7 @@ function getLinksFromForm() {
   const links = [];
   rows.forEach((row) => {
     const inputs = row.querySelectorAll("input");
-    const label = inputs[0].value.trim();
-    const url = inputs[1].value.trim();
+    const label = inputs[0].value.trim(), url = inputs[1].value.trim();
     if (url) links.push({ label: label || "Buka video", url });
   });
   return links;
@@ -394,8 +386,7 @@ addLinkRow();
 
 function resetForm() {
   editingId = null; editingExistingPhotos = []; editingCode = null; removedExistingPhotos = [];
-  formTitle.textContent = "Tambah Konten Baru";
-  submitBtn.textContent = "Bagikan Konten";
+  formTitle.textContent = "Tambah Konten Baru"; submitBtn.textContent = "Bagikan Konten";
   cancelEditBtn.style.display = "none";
   document.getElementById("photos").value = "";
   document.getElementById("preview").innerHTML = "";
@@ -411,32 +402,21 @@ cancelEditBtn.onclick = resetForm;
 
 submitBtn.onclick = async () => {
   formMsg.className = "msg"; formMsg.textContent = "";
-  const links = getLinksFromForm();
-  const tags = getTagsFromForm();
+  const links = getLinksFromForm(), tags = getTagsFromForm();
   const caption = document.getElementById("caption").value.trim();
-
   if (selectedFiles.length === 0 && editingExistingPhotos.length === 0 && links.length === 0 && !caption) {
-    formMsg.className = "msg error";
-    formMsg.textContent = "Isi minimal satu: foto, link, atau catatan.";
-    return;
+    formMsg.className = "msg error"; formMsg.textContent = "Isi minimal satu: foto, link, atau catatan."; return;
   }
-
-  submitBtn.disabled = true;
-  formMsg.textContent = "Memproses...";
-  const uploadedNow = [];
-  let dbSaved = false;
-
+  submitBtn.disabled = true; formMsg.textContent = "Memproses...";
+  const uploadedNow = []; let dbSaved = false;
   try {
     const photoUrls = [...editingExistingPhotos];
     let i = 0;
     for (const file of selectedFiles) {
-      i++;
-      formMsg.textContent = `Mengunggah foto ${i} dari ${selectedFiles.length}...`;
-      const url = await uploadToCloudflare(file);
-      photoUrls.push(url); uploadedNow.push(url);
+      i++; formMsg.textContent = `Mengunggah foto ${i} dari ${selectedFiles.length}...`;
+      const url = await uploadToCloudflare(file); photoUrls.push(url); uploadedNow.push(url);
     }
     formMsg.textContent = "Menyimpan data...";
-
     if (editingId) {
       if (!editingCode) { formMsg.textContent = "Membuat kode link..."; editingCode = await generateUniqueCode(); }
       await updateDoc(doc(db, "posts", editingId), { photoUrls, links, tags, caption: caption || null, code: editingCode });
@@ -444,10 +424,7 @@ submitBtn.onclick = async () => {
       formMsg.className = "msg success"; formMsg.textContent = "Materi berhasil diperbarui!";
       if (removedExistingPhotos.length > 0) {
         deleteFromCloudflare(removedExistingPhotos).then((cleaned) => {
-          if (!cleaned) {
-            formMsg.className = "msg error";
-            formMsg.textContent = "Materi tersimpan, tapi sebagian foto lama gagal dihapus dari Cloudflare R2.";
-          }
+          if (!cleaned) { formMsg.className = "msg error"; formMsg.textContent = "Materi tersimpan, tapi sebagian foto lama gagal dihapus dari Cloudflare R2."; }
         });
         removedExistingPhotos = [];
       }
@@ -471,41 +448,29 @@ submitBtn.onclick = async () => {
       resetFieldsOnly();
     }
   } catch (err) {
-    formMsg.className = "msg error"; formMsg.textContent = "Gagal: " + err.message;
-    console.error(err);
+    formMsg.className = "msg error"; formMsg.textContent = "Gagal: " + err.message; console.error(err);
     if (!dbSaved && uploadedNow.length > 0) deleteFromCloudflare(uploadedNow);
-  } finally {
-    submitBtn.disabled = false;
-  }
+  } finally { submitBtn.disabled = false; }
 };
 
 function resetFieldsOnly() {
   document.getElementById("photos").value = "";
   document.getElementById("preview").innerHTML = "";
   selectedFiles = [];
-  if (!editingId) {
-    linksContainer.innerHTML = ""; addLinkRow();
-    document.getElementById("tags").value = "";
-    document.getElementById("caption").value = "";
-  }
+  if (!editingId) { linksContainer.innerHTML = ""; addLinkRow(); document.getElementById("tags").value = ""; document.getElementById("caption").value = ""; }
 }
 
 function startEdit(id, data) {
-  editingId = id; editingExistingPhotos = data.photoUrls || [];
-  editingCode = data.code || null; removedExistingPhotos = []; selectedFiles = [];
+  editingId = id; editingExistingPhotos = data.photoUrls || []; editingCode = data.code || null; removedExistingPhotos = []; selectedFiles = [];
   document.getElementById("preview").innerHTML = "";
-  formTitle.textContent = "Edit konten";
-  submitBtn.textContent = "Simpan Perubahan";
-  cancelEditBtn.style.display = "block";
+  formTitle.textContent = "Edit konten"; submitBtn.textContent = "Simpan Perubahan"; cancelEditBtn.style.display = "block";
   linksContainer.innerHTML = "";
   const existingLinks = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
-  if (existingLinks.length === 0) addLinkRow();
-  else existingLinks.forEach(l => addLinkRow(l.label, l.url));
-  document.getElementById("tags").value = (data.tags || []).join(", ");
+  if (existingLinks.length === 0) addLinkRow(); else existingLinks.forEach(l => addLinkRow(l.label, l.url));
+  document.getElementById("tags").value    = (data.tags || []).join(", ");
   document.getElementById("caption").value = data.caption || "";
   document.getElementById("resultLink").style.display = "none";
-  existingPreview.innerHTML = "";
-  renderExistingPreview();
+  existingPreview.innerHTML = ""; renderExistingPreview();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -521,20 +486,17 @@ function renderExistingPreview() {
     `;
     wrap.querySelector(".removeBtn").onclick = () => {
       editingExistingPhotos = editingExistingPhotos.filter(u => u !== url);
-      removedExistingPhotos.push(url);
-      renderExistingPreview();
+      removedExistingPhotos.push(url); renderExistingPreview();
     };
     wrap.querySelector(".editCropBtn").onclick = () => {
       const swapInput = document.createElement("input");
       swapInput.type = "file"; swapInput.accept = "image/*"; swapInput.style.display = "none";
       swapInput.onchange = async () => {
-        const file = swapInput.files[0]; swapInput.remove();
-        if (!file) return;
+        const file = swapInput.files[0]; swapInput.remove(); if (!file) return;
         const cropped = await openCropperForFile(file);
         if (cropped) {
           editingExistingPhotos = editingExistingPhotos.filter(u => u !== url);
-          removedExistingPhotos.push(url);
-          selectedFiles.push(makeCroppedFile(cropped, file.name));
+          removedExistingPhotos.push(url); selectedFiles.push(makeCroppedFile(cropped, file.name));
           renderExistingPreview(); renderNewPreview();
         }
       };
@@ -550,11 +512,9 @@ async function removePost(id, photoUrls) {
     await deleteDoc(doc(db, "posts", id));
     if (photoUrls && photoUrls.length > 0) {
       const cleaned = await deleteFromCloudflare(photoUrls);
-      if (!cleaned) alert("Post terhapus dari database, tapi sebagian foto gagal dihapus dari Cloudflare R2.");
+      if (!cleaned) alert("Post sudah terhapus dari database, tetapi sebagian file foto gagal dihapus dari Cloudflare R2.");
     }
-  } catch (err) {
-    alert("Gagal menghapus: " + err.message);
-  }
+  } catch (err) { alert("Gagal menghapus: " + err.message); }
 }
 
 let allPostsCache = [];
@@ -570,17 +530,13 @@ function listenPosts() {
 }
 
 function normalizeSearchText(str) {
-  return (str || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return (str || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 }
 
 function getPostSearchBlob(data) {
-  const tagsList = data.tags || [];
+  const tagsList  = data.tags  || [];
   const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
-  return normalizeSearchText([
-    data.caption || "", tagsList.join(" "),
-    linksList.map(l => `${l.label || ""} ${l.url || ""}`).join(" "),
-    data.code || ""
-  ].join(" "));
+  return normalizeSearchText([data.caption || "", tagsList.join(" "), linksList.map(l => `${l.label || ""} ${l.url || ""}`).join(" "), data.code || ""].join(" "));
 }
 
 function highlightMatch(text, terms) {
@@ -607,52 +563,37 @@ if (adminSortBarEl) {
   adminSortBarEl.querySelectorAll(".admin-sort-chip").forEach((btn) => {
     btn.addEventListener("click", () => {
       adminSortBarEl.querySelectorAll(".admin-sort-chip").forEach((t) => t.classList.remove("active"));
-      btn.classList.add("active");
-      currentAdminSort = btn.dataset.sort;
-      applyAdminSearch();
+      btn.classList.add("active"); currentAdminSort = btn.dataset.sort; applyAdminSearch();
     });
   });
 }
 
 document.getElementById("adminSearchInput").addEventListener("input", applyAdminSearch);
 document.getElementById("adminSearchClear").addEventListener("click", () => {
-  document.getElementById("adminSearchInput").value = "";
-  applyAdminSearch();
-  document.getElementById("adminSearchInput").focus();
+  document.getElementById("adminSearchInput").value = ""; applyAdminSearch(); document.getElementById("adminSearchInput").focus();
 });
 
 function applyAdminSearch() {
   document.getElementById("totalPostCount").textContent = allPostsCache.length;
-  const listEl = document.getElementById("postList");
-  const countEl = document.getElementById("adminSearchCount");
-  const clearBtn = document.getElementById("adminSearchClear");
-  const rawQuery = document.getElementById("adminSearchInput").value;
-  const normalizedQuery = normalizeSearchText(rawQuery);
-  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const listEl    = document.getElementById("postList");
+  const countEl   = document.getElementById("adminSearchCount");
+  const clearBtn  = document.getElementById("adminSearchClear");
+  const rawQuery  = document.getElementById("adminSearchInput").value;
+  const terms     = normalizeSearchText(rawQuery).split(/\s+/).filter(Boolean);
   clearBtn.style.display = rawQuery ? "flex" : "none";
-
-  const filtered = terms.length
-    ? allPostsCache.filter(({ data }) => { const blob = getPostSearchBlob(data); return terms.every(term => blob.includes(term)); })
-    : allPostsCache;
-
+  const filtered  = terms.length ? allPostsCache.filter(({ data }) => { const blob = getPostSearchBlob(data); return terms.every(term => blob.includes(term)); }) : allPostsCache;
   countEl.textContent = terms.length ? `${filtered.length} dari ${allPostsCache.length} postingan cocok` : "";
-
   if (allPostsCache.length === 0) { listEl.innerHTML = '<p class="empty">Belum ada materi.</p>'; return; }
   if (filtered.length === 0) { listEl.innerHTML = '<p class="empty">Tidak ada postingan yang cocok dengan pencarian.</p>'; return; }
-
   listEl.innerHTML = "";
   sortAdminPosts(filtered).forEach(({ id, data }) => {
-    const date = data.createdAt?.toDate
-      ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
-      : "";
-    const thumbs = (data.photoUrls || []).map(url => `<img ${imgAttrs(url)}>`).join("");
+    const date = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+    const thumbs    = (data.photoUrls || []).map(url => `<img ${imgAttrs(url)}>`).join("");
     const linksList = data.links || (data.taskLink ? [{ label: "Buka Link", url: data.taskLink }] : []);
     const linksHtml = linksList.map(l => `<div class="link">${linkIconSvgSmall}${highlightMatch(l.label, terms)}: ${highlightMatch(l.url, terms)}</div>`).join("");
-    const tagsList = data.tags || [];
-    const tagsHtml = tagsList.length ? `<div class="link">${tagIconSvgSmall}${tagsList.map(t => highlightMatch(t, terms)).join(", ")}</div>` : "";
-    const postViews = data.postViews || 0, linkClicks = data.linkClicks || 0;
-    const viewsHtml = `<div class="link views-count">${eyeIconSvgSmall}${postViews} dilihat &nbsp;·&nbsp; ${linkIconSvgSmall}${linkClicks} klik link</div>`;
-
+    const tagsList  = data.tags || [];
+    const tagsHtml  = tagsList.length ? `<div class="link">${tagIconSvgSmall}${tagsList.map(t => highlightMatch(t, terms)).join(", ")}</div>` : "";
+    const viewsHtml = `<div class="link views-count">${eyeIconSvgSmall}${data.postViews || 0} dilihat &nbsp;·&nbsp; ${linkIconSvgSmall}${data.linkClicks || 0} klik link</div>`;
     const item = document.createElement("div");
     item.className = "post-item";
     item.innerHTML = `
@@ -667,22 +608,22 @@ function applyAdminSearch() {
       </div>
     `;
     const postUrl = data.code ? `${window.location.origin}/p/${data.code}` : `${window.location.origin}/?post=${id}`;
-    item.querySelector(".editBtn").onclick = () => startEdit(id, data);
-    item.querySelector(".shareBtn").onclick = () => sharePostLink(postUrl);
+    item.querySelector(".editBtn").onclick   = () => startEdit(id, data);
+    item.querySelector(".shareBtn").onclick  = () => sharePostLink(postUrl);
     item.querySelector(".deleteBtn").onclick = () => removePost(id, data.photoUrls);
     listEl.appendChild(item);
   });
 }
 
-/* ================== SLOT LINK FLEKSIBEL ================== */
+// ================== CHIP BAR ==================
 async function loadChipBarSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "chipbar"));
     if (!snap.exists()) return;
     const data = snap.data();
     [1, 2, 3].forEach((n) => {
-      document.getElementById(`chip${n}Name`).value = data[`chip${n}Name`] || "";
-      document.getElementById(`chip${n}Link`).value = data[`chip${n}Link`] || "";
+      document.getElementById(`chip${n}Name`).value   = data[`chip${n}Name`]  || "";
+      document.getElementById(`chip${n}Link`).value   = data[`chip${n}Link`]  || "";
       document.getElementById(`chip${n}Active`).checked = data[`chip${n}Active`] !== false;
     });
   } catch (err) { console.error("Gagal memuat slot link fleksibel:", err); }
@@ -695,161 +636,112 @@ document.getElementById("saveChipBarBtn").onclick = async () => {
   for (const n of [1, 2, 3]) {
     const name = document.getElementById(`chip${n}Name`).value.trim();
     const link = document.getElementById(`chip${n}Link`).value.trim();
-    if ((name && !link) || (!name && link)) {
-      msgEl.className = "msg error";
-      msgEl.textContent = `Slot ${n}: nama tab dan link harus diisi dua-duanya (atau kosongkan keduanya).`;
-      return;
-    }
-    if (link && !/^https?:\/\//i.test(link)) {
-      msgEl.className = "msg error";
-      msgEl.textContent = `Slot ${n}: link harus diawali http:// atau https://`;
-      return;
-    }
-    payload[`chip${n}Name`] = name || null;
-    payload[`chip${n}Link`] = link || null;
+    if ((name && !link) || (!name && link)) { msgEl.className = "msg error"; msgEl.textContent = `Slot ${n}: nama tab dan link harus diisi dua-duanya (atau kosongkan keduanya).`; return; }
+    if (link && !/^https?:\/\//i.test(link)) { msgEl.className = "msg error"; msgEl.textContent = `Slot ${n}: link harus diawali http:// atau https://`; return; }
+    payload[`chip${n}Name`]   = name || null;
+    payload[`chip${n}Link`]   = link || null;
     payload[`chip${n}Active`] = document.getElementById(`chip${n}Active`).checked;
   }
   msgEl.textContent = "Menyimpan...";
-  try {
-    await setDoc(doc(db, "settings", "chipbar"), payload);
-    msgEl.className = "msg success"; msgEl.textContent = "Slot link berhasil disimpan!";
-  } catch (err) { msgEl.className = "msg error"; msgEl.textContent = "Gagal: " + err.message; }
+  try { await setDoc(doc(db, "settings", "chipbar"), payload); msgEl.className = "msg success"; msgEl.textContent = "Slot link berhasil disimpan!"; }
+  catch (err) { msgEl.className = "msg error"; msgEl.textContent = "Gagal: " + err.message; }
 };
 
-/* ================== DOMAIN LINK EMBED — SISTEM GRUP ==================
-   Setiap "grup" = satu platform video hosting:
-   - target  : domain tujuan platform ini
-   - sources : domain-domain lama platform ini yang dialihkan ke target
+/* ================== DOMAIN MAPPING PER-GRUP ==================
+   Struktur Firestore (settings/linkDomain):
+   { groups: [ { target: "https://D.com", sources: ["https://A.com", "https://B.com"] }, ... ] }
 
-   Cara pakai di dasbor:
-   - Klik "+ Tambah Grup Platform" untuk menambah platform baru
-   - Dalam setiap grup, isi domain tujuan dan tambah domain sumber sebanyak yang dibutuhkan
-   - Klik "Hapus Grup" untuk menghapus seluruh platform
-   - Klik ✕ di baris domain sumber untuk menghapus satu sumber saja
-   - Simpan → berlaku langsung di halaman pengunjung */
+   Setiap platform hosting video punya grupnya sendiri.
+   Tambah grup → "+ Tambah Grup Platform"
+   Hapus grup  → "Hapus Grup" di sudut kanan atas tiap grup
+   Domain tidak terdaftar → tetap jalan apa adanya
+   Kompatibilitas mundur: field "target"/"domain" + "sources" → satu grup otomatis */
 
-const groupsContainerEl = document.getElementById("linkDomainGroupsContainer");
+const domainGroupsContainer = document.getElementById("domainGroupsContainer");
 
-function createGroupBlock(target = "", sources = []) {
-  const groupIdx = groupsContainerEl.children.length + 1;
-  const block = document.createElement("div");
-  block.className = "domain-group-block";
-  block.innerHTML = `
+function createGroupEl(targetVal = "", sourcesArr = []) {
+  const groupEl = document.createElement("div");
+  groupEl.className = "domain-group";
+  groupEl.innerHTML = `
     <div class="domain-group-header">
-      <span class="domain-group-label">Platform ${groupIdx}</span>
+      <span class="domain-group-label">Platform</span>
       <button type="button" class="domain-group-remove-btn" title="Hapus grup ini">Hapus Grup</button>
     </div>
     <label>Domain Tujuan</label>
-    <input type="url" class="domain-target-input" placeholder="https://domain-baru.com" value="${escapeAttr(target)}">
-    <label style="margin-top:10px;">Domain Sumber</label>
+    <input type="url" class="domain-target-input" placeholder="https://domain-baru.com" value="${escapeAttr(targetVal)}">
+    <label style="margin-top:10px;">Domain Sumber <span style="font-weight:400;font-size:11px;color:#aaa;">(semua diarahkan ke tujuan di atas)</span></label>
     <div class="domain-sources-list"></div>
     <button type="button" class="add-source-btn">+ Tambah Domain Sumber</button>
   `;
-
-  block.querySelector(".domain-group-remove-btn").onclick = () => {
-    block.remove();
-    renumberGroups();
+  groupEl.querySelector(".domain-group-remove-btn").onclick = () => {
+    if (confirm("Hapus grup platform ini beserta semua domain sumbernya?")) groupEl.remove();
   };
-
-  block.querySelector(".add-source-btn").onclick = () => {
-    addSourceRowToBlock(block.querySelector(".domain-sources-list"));
-  };
-
-  const sourcesList = block.querySelector(".domain-sources-list");
-  if (sources.length > 0) {
-    sources.forEach(src => addSourceRowToBlock(sourcesList, src));
-  } else {
-    addSourceRowToBlock(sourcesList); // satu baris kosong untuk mulai isi
-  }
-
-  groupsContainerEl.appendChild(block);
+  groupEl.querySelector(".add-source-btn").onclick = () => addSourceRowToGroup(groupEl);
+  sourcesArr.forEach(src => addSourceRowToGroup(groupEl, src));
+  return groupEl;
 }
 
-function addSourceRowToBlock(sourcesList, value = "") {
-  const row = document.createElement("div");
+function addSourceRowToGroup(groupEl, value = "") {
+  const list = groupEl.querySelector(".domain-sources-list");
+  const row  = document.createElement("div");
   row.className = "link-row";
   row.innerHTML = `
     <input type="url" class="source-input" placeholder="https://domain-lama.com" value="${escapeAttr(value)}">
     <button type="button" title="Hapus domain sumber ini">✕</button>
   `;
   row.querySelector("button").onclick = () => row.remove();
-  sourcesList.appendChild(row);
+  list.appendChild(row);
 }
 
-function renumberGroups() {
-  groupsContainerEl.querySelectorAll(".domain-group-label").forEach((label, idx) => {
-    label.textContent = `Platform ${idx + 1}`;
-  });
-}
-
-document.getElementById("addDomainGroupBtn").onclick = () => createGroupBlock();
+document.getElementById("addDomainGroupBtn").onclick = () => {
+  domainGroupsContainer.appendChild(createGroupEl());
+};
 
 async function loadLinkDomainSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "linkDomain"));
-    groupsContainerEl.innerHTML = "";
-    if (!snap.exists()) { createGroupBlock(); return; }
+    domainGroupsContainer.innerHTML = "";
+    if (!snap.exists()) return;
     const data = snap.data();
-
     if (Array.isArray(data.groups) && data.groups.length > 0) {
-      // Format baru: array of groups
-      data.groups.forEach(g => createGroupBlock(g.target || "", g.sources || []));
+      data.groups.forEach(g => {
+        domainGroupsContainer.appendChild(createGroupEl(g.target || "", Array.isArray(g.sources) ? g.sources : []));
+      });
     } else if (data.target || data.domain) {
-      // Format lama → satu grup
-      createGroupBlock(data.target || data.domain || "", Array.isArray(data.sources) ? data.sources : []);
-    } else {
-      createGroupBlock();
+      domainGroupsContainer.appendChild(createGroupEl(
+        data.target || data.domain || "",
+        Array.isArray(data.sources) ? data.sources : []
+      ));
     }
-  } catch (err) {
-    console.error("Gagal memuat pengaturan domain link:", err);
-    groupsContainerEl.innerHTML = "";
-    createGroupBlock();
-  }
+  } catch (err) { console.error("Gagal memuat pengaturan domain link:", err); }
 }
 
 document.getElementById("saveLinkDomainBtn").onclick = async () => {
-  const msgEl = document.getElementById("linkDomainMsg");
+  const msgEl   = document.getElementById("linkDomainMsg");
   msgEl.className = "msg";
-
-  const groups = [];
-  let hasError = false;
-
-  groupsContainerEl.querySelectorAll(".domain-group-block").forEach((block, idx) => {
-    if (hasError) return;
-    const target = block.querySelector(".domain-target-input").value.trim();
-    const sources = Array.from(block.querySelectorAll(".source-input"))
-      .map(el => el.value.trim()).filter(Boolean);
-
+  const groupEls = domainGroupsContainer.querySelectorAll(".domain-group");
+  const groups   = [];
+  for (const groupEl of groupEls) {
+    const target = groupEl.querySelector(".domain-target-input").value.trim();
     if (target && !/^https?:\/\//i.test(target)) {
-      msgEl.className = "msg error";
-      msgEl.textContent = `Platform ${idx + 1}: domain tujuan harus diawali http:// atau https://`;
-      hasError = true; return;
+      msgEl.className = "msg error"; msgEl.textContent = `Domain tujuan "${target}" harus diawali http:// atau https://`; return;
     }
+    const sources = Array.from(groupEl.querySelectorAll(".source-input")).map(el => el.value.trim()).filter(Boolean);
     for (const src of sources) {
       if (!/^https?:\/\//i.test(src)) {
-        msgEl.className = "msg error";
-        msgEl.textContent = `Platform ${idx + 1}: domain sumber "${src}" harus diawali http:// atau https://`;
-        hasError = true; return;
+        msgEl.className = "msg error"; msgEl.textContent = `Domain sumber "${src}" harus diawali http:// atau https://`; return;
       }
     }
-    // Hanya simpan grup yang punya target (grup kosong diabaikan)
     if (target) groups.push({ target, sources });
-  });
-
-  if (hasError) return;
-
+  }
   msgEl.textContent = "Menyimpan...";
   try {
     await setDoc(doc(db, "settings", "linkDomain"), { groups });
-    msgEl.className = "msg success";
-    msgEl.textContent = `${groups.length} grup platform berhasil disimpan!`;
-  } catch (err) {
-    msgEl.className = "msg error";
-    msgEl.textContent = "Gagal: " + err.message;
-  }
+    msgEl.className = "msg success"; msgEl.textContent = "Pengaturan domain berhasil disimpan!";
+  } catch (err) { msgEl.className = "msg error"; msgEl.textContent = "Gagal: " + err.message; }
 };
 
-/* ================== KONTAK ================== */
+// ================== KONTAK ==================
 async function loadContactSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "contact"));
@@ -876,16 +768,9 @@ document.getElementById("saveContactBtn").onclick = async () => {
 };
 
 async function sharePostLink(url) {
-  if (navigator.share) {
-    try { await navigator.share({ url }); } catch (err) {}
-  } else if (navigator.clipboard) {
-    try { await navigator.clipboard.writeText(url); alert("Link disalin!"); }
-    catch (err) { prompt("Salin link ini secara manual:", url); }
-  } else { prompt("Salin link ini secara manual:", url); }
+  if (navigator.share) { try { await navigator.share({ url }); } catch (err) {} }
+  else if (navigator.clipboard) { try { await navigator.clipboard.writeText(url); alert("Link disalin!"); } catch (err) { prompt("Salin link ini secara manual:", url); } }
+  else prompt("Salin link ini secara manual:", url);
 }
 
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
+function escapeHtml(str) { const div = document.createElement("div"); div.textContent = str; return div.innerHTML; }
