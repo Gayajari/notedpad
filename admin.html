@@ -147,6 +147,23 @@
     font-weight: 600;
   }
   #addDomainGroupBtn:hover { background: #e6ecff; }
+
+  /* Direct link icon pada slot link fleksibel */
+  .chip-direct-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #f0f4ff;
+    color: #4a6cf7;
+    border: 1px solid #d0d8f7;
+    flex-shrink: 0;
+    text-decoration: none;
+    transition: background .15s, color .15s;
+  }
+  .chip-direct-link:hover { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
 </style>
 </head>
 <body>
@@ -207,7 +224,12 @@
       <label>Slot 1 — Nama Tab</label>
       <input type="text" id="chip1Name" placeholder="misal: Grup Bonus">
       <label>Slot 1 — Link</label>
-      <input type="url" id="chip1Link" placeholder="https://...">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="url" id="chip1Link" placeholder="https://..." style="flex:1;margin:0;">
+        <a id="chip1DirectLink" href="#" target="_blank" rel="noopener" class="chip-direct-link" title="Buka link" style="display:none;">
+          <svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+      </div>
       <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;">
         <input type="checkbox" id="chip1Active" style="width:auto;" checked> Aktif
       </label>
@@ -215,7 +237,12 @@
       <label style="margin-top:14px;">Slot 2 — Nama Tab</label>
       <input type="text" id="chip2Name" placeholder="misal: Promo Terbaru">
       <label>Slot 2 — Link</label>
-      <input type="url" id="chip2Link" placeholder="https://...">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="url" id="chip2Link" placeholder="https://..." style="flex:1;margin:0;">
+        <a id="chip2DirectLink" href="#" target="_blank" rel="noopener" class="chip-direct-link" title="Buka link" style="display:none;">
+          <svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+      </div>
       <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;">
         <input type="checkbox" id="chip2Active" style="width:auto;" checked> Aktif
       </label>
@@ -223,7 +250,12 @@
       <label style="margin-top:14px;">Slot 3 — Nama Tab</label>
       <input type="text" id="chip3Name" placeholder="misal: Channel Utama">
       <label>Slot 3 — Link</label>
-      <input type="url" id="chip3Link" placeholder="https://...">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="url" id="chip3Link" placeholder="https://..." style="flex:1;margin:0;">
+        <a id="chip3DirectLink" href="#" target="_blank" rel="noopener" class="chip-direct-link" title="Buka link" style="display:none;">
+          <svg class="icon-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+      </div>
       <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:500;">
         <input type="checkbox" id="chip3Active" style="width:auto;" checked> Aktif
       </label>
