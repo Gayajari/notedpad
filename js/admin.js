@@ -616,15 +616,38 @@ function applyAdminSearch() {
 }
 
 // ================== CHIP BAR ==================
+
+// Update tombol direct link sesuai isi input
+function updateChipDirectLink(n) {
+  const linkEl     = document.getElementById(`chip${n}Link`);
+  const directLink = document.getElementById(`chip${n}DirectLink`);
+  if (!linkEl || !directLink) return;
+  const val = linkEl.value.trim();
+  if (val && /^https?:\/\//i.test(val)) {
+    directLink.href = val;
+    directLink.style.display = "inline-flex";
+  } else {
+    directLink.href = "#";
+    directLink.style.display = "none";
+  }
+}
+
+// Pasang listener input pada semua slot
+[1, 2, 3].forEach((n) => {
+  const linkEl = document.getElementById(`chip${n}Link`);
+  if (linkEl) linkEl.addEventListener("input", () => updateChipDirectLink(n));
+});
+
 async function loadChipBarSettings() {
   try {
     const snap = await getDoc(doc(db, "settings", "chipbar"));
     if (!snap.exists()) return;
     const data = snap.data();
     [1, 2, 3].forEach((n) => {
-      document.getElementById(`chip${n}Name`).value   = data[`chip${n}Name`]  || "";
-      document.getElementById(`chip${n}Link`).value   = data[`chip${n}Link`]  || "";
+      document.getElementById(`chip${n}Name`).value     = data[`chip${n}Name`]   || "";
+      document.getElementById(`chip${n}Link`).value     = data[`chip${n}Link`]   || "";
       document.getElementById(`chip${n}Active`).checked = data[`chip${n}Active`] !== false;
+      updateChipDirectLink(n); // tampilkan ikon jika link sudah ada
     });
   } catch (err) { console.error("Gagal memuat slot link fleksibel:", err); }
 }
