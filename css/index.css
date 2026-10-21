@@ -279,6 +279,22 @@ header h1 em {
   border-color: #2b3a67;
 }
 
+/* Icon kecil di dalam chip (kategori/kontak/tag) — dikunci ukurannya
+   supaya kalau gambar gagal dimuat, ikon broken-image browser tidak
+   melar jadi besar/memanjang. */
+.category-chip img,
+.contact-chip img,
+.tag-chip img,
+.post-chip-bar a img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
 /* ══════════════════════════════════════
    SORT CHIP BAR  (Terbaru / Terlama / Populer)
 ══════════════════════════════════════ */
@@ -287,6 +303,7 @@ header h1 em {
   gap: 6px;
   overflow-x: auto;
   padding: 8px 15px;
+  margin: 0;
   -webkit-overflow-scrolling: touch;
   border-bottom: 1px solid #e3e5ec;
   background: #fff8f0;
