@@ -46,14 +46,15 @@ const firebaseConfig = {
 };
 
 // Link sosmed disimpan di document tunggal settings/contact (bukan collection per-id)
-const COLLECTION_NAME = "settings";
-const DOCUMENT_ID = "contact";
-
-// key kiri = nilai parameter ?to=, value kanan = nama field di Firestore (settings/contact)
-const FIELD_MAP = {
-  telegram: "telegram",
-  whatsapp: "whatsapp",
-  tutorial: "facebook"
+// Link chip fleksibel disimpan di settings/chipbar
+// key kiri = nilai parameter ?to=
+const SOURCE_MAP = {
+  telegram: { docId: "contact", field: "telegram"  },
+  whatsapp: { docId: "contact", field: "whatsapp"  },
+  tutorial: { docId: "contact", field: "facebook"  },
+  chip1:    { docId: "chipbar", field: "chip1Link" },
+  chip2:    { docId: "chipbar", field: "chip2Link" },
+  chip3:    { docId: "chipbar", field: "chip3Link" },
 };
 
 const DURATION = 5; // detik jeda iklan
@@ -61,8 +62,8 @@ const DURATION = 5; // detik jeda iklan
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Sama seperti index.js -- cache lokal biar link Telegram/WhatsApp/Tutorial
-// yang sering diklik pengunjung tidak perlu selalu tarik ulang dari server.
+// Sama seperti index.js -- cache lokal biar link yang sering diklik
+// tidak perlu selalu tarik ulang dari server.
 enableIndexedDbPersistence(db).catch((err) => {
   console.warn("Cache lokal Firestore tidak aktif:", err.code || err);
 });
@@ -88,14 +89,15 @@ const statusText = document.getElementById('statusText');
 let targetURL = null;
 
 async function loadTargetURL() {
-  if (!toParam || !FIELD_MAP[toParam]) {
+  if (!toParam || !SOURCE_MAP[toParam]) {
     statusText.innerHTML = '<span class="error-text">Tautan tujuan tidak valid.</span>';
     skipBtn.style.display = 'none';
     return;
   }
 
   try {
-    const docRef = doc(db, COLLECTION_NAME, DOCUMENT_ID);
+    const src = SOURCE_MAP[toParam];
+    const docRef = doc(db, "settings", src.docId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
@@ -105,8 +107,7 @@ async function loadTargetURL() {
     }
 
     const data = docSnap.data();
-    const fieldName = FIELD_MAP[toParam];
-    targetURL = data[fieldName];
+    targetURL = data[src.field];
 
     if (!targetURL) {
       statusText.innerHTML = '<span class="error-text">Tautan belum diisi.</span>';
