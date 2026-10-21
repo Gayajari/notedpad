@@ -189,8 +189,7 @@ async function loadCustomChipBar() {
       const href = safeHttpUrl(data[`chip${n}Link`]);
       const active = data[`chip${n}Active`] !== false;
       if (active && name && href) {
-        // Lewatkan halaman perantara (redirect + iklan) sebelum buka link asli
-        html += `<a href="/redirect.html?to=chip${n}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
+        html += `<a href="${escapeHtmlAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
       }
     });
     postChipBarHtml = html ? `<div class="post-chip-bar">${html}</div>` : "";
