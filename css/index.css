@@ -199,7 +199,9 @@ header h1 em {
 .ads-banner {
   text-align: center;
   background: #fff;
-  border-bottom: 1px solid #e3e5ec;
+  border-bottom: none;
+  margin: 0;
+  padding: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -218,11 +220,17 @@ header h1 em {
 }
 .contact-bar::-webkit-scrollbar { display: none; }
 
+/* index.js mengisi #contactBar dengan <a> polos tanpa class, jadi
+   selector-nya harus langsung ".contact-bar a" (bukan cuma .contact-chip)
+   supaya semua link kontak (Telegram/Cara nonton/WhatsApp) kebagian
+   style pill ini — kalau tidak, dia jatuh ke warna link default
+   browser (biru/ungu) dan bentuknya cuma garis tipis mentah. */
+.contact-bar a,
 .contact-chip {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   text-decoration: none;
   background: #fff;
   border: 1.5px solid #e3e5ec;
@@ -231,13 +239,16 @@ header h1 em {
   border-radius: 999px;
   font-size: 11.5px;
   font-weight: 500;
-  transition: border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
 }
+.contact-bar a:active,
 .contact-chip:active {
   border-color: #2b3a67;
   background: #2b3a67;
   color: #fff;
 }
+.contact-bar a:visited { color: #2b3a67; }
 
 /* ══════════════════════════════════════
    CATEGORY BAR
@@ -325,7 +336,7 @@ header h1 em {
   padding: 8px 15px;
   margin: 0;
   -webkit-overflow-scrolling: touch;
-  border-bottom: 1px solid #e3e5ec;
+  border-bottom: none;
   background: #fff8f0;
 }
 .sort-chip-bar::-webkit-scrollbar { display: none; }
