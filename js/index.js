@@ -81,32 +81,32 @@ function createAdsSlot(zone, showLabel) {
 
 document.getElementById("headerAdsSlot").appendChild(buildAdsIframe(ADS_ZONE_LEADERBOARD));
 
-/* ================== DOMAIN LINK EMBED — SISTEM GRUP ==================
-   Mendukung banyak grup mapping domain, masing-masing punya:
-   - target  : domain tujuan (misal: https://vidara-baru.com)
-   - sources : array domain sumber (misal: ["https://A.com", "https://B.com"])
+/* ================== DOMAIN MAPPING PER-GRUP (settings/linkDomain) ==================
+   Struktur data di Firestore (settings/linkDomain):
+   {
+     groups: [
+       { target: "https://D.com", sources: ["https://A.com", "https://B.com"] },
+       { target: "https://G.com", sources: ["https://E.com", "https://F.com"] },
+       ...
+     ]
+   }
 
-   Cara kerja saat render link:
-   1. Cek host URL link di setiap grup.sources
-   2. Kalau cocok → ganti host dengan grup.target
-   3. Kalau tidak cocok di grup mana pun → URL tetap jalan apa adanya
+   Cara kerja replaceEmbedDomain:
+   - Setiap URL dicek host-nya terhadap SEMUA grup
+   - Kalau host cocok dengan salah satu sumber di grup tertentu →
+     host URL diganti ke domain tujuan grup tersebut
+   - Kalau tidak cocok dengan grup mana pun → URL tetap jalan apa adanya
 
-   Dengan begini setiap platform hosting bisa punya jalur sendiri:
-   - Grup 1: Vidara  (sumber A,B,C → tujuan D)
-   - Grup 2: Vimeo   (sumber E,F   → tujuan G)
-   - Grup 3: dst...
-
-   Kompatibilitas mundur: format lama ({ target, sources }) tanpa array groups
-   masih terbaca sebagai satu grup. */
-
-let activeDomainGroups = []; // [{ target: "https://...", sources: ["https://...", ...] }]
+   Kompatibilitas mundur: format lama (field "target" + "sources" tanpa groups)
+   masih terbaca dan dikonversi jadi satu grup otomatis. */
+let domainGroups = []; // [{ target, sources: [url, ...] }, ...]
 
 function replaceEmbedDomain(originalUrl) {
-  if (activeDomainGroups.length === 0) return originalUrl;
+  if (domainGroups.length === 0) return originalUrl;
   try {
     const url = new URL(originalUrl);
-    for (const group of activeDomainGroups) {
-      if (!group.target || !Array.isArray(group.sources) || group.sources.length === 0) continue;
+    for (const group of domainGroups) {
+      if (!group.target || !Array.isArray(group.sources)) continue;
       const matched = group.sources.some((src) => {
         try { return new URL(src).host === url.host; } catch (e) { return false; }
       });
@@ -126,24 +126,24 @@ function replaceEmbedDomain(originalUrl) {
 async function loadLinkDomainSetting() {
   try {
     const snap = await getDoc(doc(db, "settings", "linkDomain"));
-    if (!snap.exists()) { activeDomainGroups = []; return; }
+    if (!snap.exists()) { domainGroups = []; return; }
     const data = snap.data();
 
     if (Array.isArray(data.groups)) {
       // Format baru: array of groups
-      activeDomainGroups = data.groups.filter(g => g.target && Array.isArray(g.sources));
+      domainGroups = data.groups.filter(g => g.target && Array.isArray(g.sources));
     } else if (data.target || data.domain) {
-      // Format lama (sebelum sistem grup) → jadikan satu grup
-      activeDomainGroups = [{
+      // Format lama: satu target + sources → konversi ke satu grup
+      domainGroups = [{
         target: data.target || data.domain,
         sources: Array.isArray(data.sources) ? data.sources : []
       }];
     } else {
-      activeDomainGroups = [];
+      domainGroups = [];
     }
   } catch (err) {
     console.error("Gagal memuat pengaturan domain link:", err);
-    activeDomainGroups = [];
+    domainGroups = [];
   }
 }
 
@@ -157,7 +157,6 @@ async function loadLinkDomainSetting() {
   renderMain(postId);
 })();
 
-/* ================== SLOT LINK FLEKSIBEL ================== */
 let postChipBarHtml = "";
 
 const playIconSvg = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" style="flex-shrink:0;"><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.18"/><path d="M10 8.3v7.4c0 .6.65 1 1.2.68l6.1-3.7c.55-.33.55-1.1 0-1.44l-6.1-3.7c-.55-.34-1.2.06-1.2.66z" fill="currentColor"/></svg>`;
@@ -190,7 +189,8 @@ async function loadCustomChipBar() {
       const href = safeHttpUrl(data[`chip${n}Link`]);
       const active = data[`chip${n}Active`] !== false;
       if (active && name && href) {
-        html += `<a href="${escapeHtmlAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
+        // Lewatkan halaman perantara (redirect + iklan) sebelum buka link asli
+        html += `<a href="/redirect.html?to=chip${n}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`;
       }
     });
     postChipBarHtml = html ? `<div class="post-chip-bar">${html}</div>` : "";
@@ -200,7 +200,6 @@ async function loadCustomChipBar() {
   }
 }
 
-/* ================== INDEKS TAG ================== */
 let allTagsCache = [];
 
 async function loadAllTagsIndex() {
@@ -275,10 +274,7 @@ function loadCategoryBar() {
 
 function renderCategoryBar() {
   const bar = document.getElementById("categoryBar");
-  if (allTagsCache.length === 0) {
-    bar.innerHTML = "";
-    return;
-  }
+  if (allTagsCache.length === 0) { bar.innerHTML = ""; return; }
   let html = `<a class="category-chip${!tagParam ? " active" : ""}" href="${window.location.origin}/">Semua</a>`;
   allTagsCache.forEach((t) => {
     const isActive = tagParam === t;
@@ -383,7 +379,6 @@ function renderSuggestions(qText) {
     html += `<a class="search-suggestion-item" href="${href}"><svg class="icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg> ${escapeHtml(p.caption)}</a>`;
   });
   if (!html) html = `<div class="search-suggestion-item" style="color:#999;">Tidak ada saran</div>`;
-
   suggestBox.innerHTML = html;
   suggestBox.classList.add("show");
 }
@@ -399,9 +394,7 @@ function runFullSearch(qTextRaw) {
   const filtered = allDocsCache.filter((docSnap) => {
     const data = docSnap.data();
     const tags = data.tags || [];
-    const matchTag = tags.some((t) => t.toLowerCase().includes(qText));
-    const matchCaption = (data.caption || "").toLowerCase().includes(qText);
-    return matchTag || matchCaption;
+    return tags.some((t) => t.toLowerCase().includes(qText)) || (data.caption || "").toLowerCase().includes(qText);
   });
 
   postsEl.innerHTML = "";
@@ -432,9 +425,7 @@ function renderPost(docSnap) {
     : "";
 
   const photoUrls = data.photoUrls || [];
-  const photos = photoUrls
-    .map(url => `<img ${imgAttrs(url)} onclick="openLightbox('${imgSrc(url)}')">`)
-    .join("");
+  const photos = photoUrls.map(url => `<img ${imgAttrs(url)} onclick="openLightbox('${imgSrc(url)}')">`) .join("");
   const photosClass = photoUrls.length > 1 ? "post-photos multi" : "post-photos single";
 
   const linksList = data.links || (data.taskLink ? [{ label: "Buka video", url: data.taskLink }] : []);
@@ -443,6 +434,7 @@ function renderPost(docSnap) {
     .join("");
 
   const caption = data.caption ? `<div class="post-caption">${escapeHtml(data.caption)}</div>` : "";
+
   const tagsList = data.tags || [];
   const tagsHtml = tagsList.length
     ? `<div class="post-tags">${tagsList.map(t => `<a class="tag-chip" href="?tag=${encodeURIComponent(t)}">${escapeHtml(t.replace(/^#+/, ""))}</a>`).join("")}</div>`
@@ -480,10 +472,7 @@ function renderPost(docSnap) {
 function renderMain(postId) {
   if (postId) {
     getDoc(doc(db, "posts", postId)).then((docSnap) => {
-      if (!docSnap.exists()) {
-        postsEl.innerHTML = '<p class="empty">Materi tidak ditemukan.</p>';
-        return;
-      }
+      if (!docSnap.exists()) { postsEl.innerHTML = '<p class="empty">Materi tidak ditemukan.</p>'; return; }
       postsEl.innerHTML = "";
       postsEl.appendChild(renderPost(docSnap));
 
@@ -516,9 +505,8 @@ function renderMain(postId) {
         seeAll.innerHTML = `<svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg> Lihat Semua Konten`;
         otherWrap.appendChild(seeAll);
       });
-    }).catch(() => {
-      postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>';
-    });
+    }).catch(() => { postsEl.innerHTML = '<p class="empty">Gagal memuat materi.</p>'; });
+
   } else if (tagParam) {
     const qTag = query(collection(db, "posts"), where("tags", "array-contains", tagParam), orderBy("createdAt", "desc"));
     onSnapshot(qTag, (snapshot) => {
@@ -535,10 +523,9 @@ function renderMain(postId) {
         empty.textContent = "Belum ada konten dengan tag ini.";
         postsEl.appendChild(empty);
       } else {
-        const docs = snapshot.docs;
-        docs.forEach((d, idx) => {
+        snapshot.docs.forEach((d, idx) => {
           postsEl.appendChild(renderPost(d));
-          if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== docs.length - 1) {
+          if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== snapshot.docs.length - 1) {
             postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
           }
         });
@@ -550,6 +537,7 @@ function renderMain(postId) {
       seeAll.innerHTML = `<svg class="icon-sm" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg> Lihat Semua Konten`;
       postsEl.appendChild(seeAll);
     });
+
   } else {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(MAIN_FEED_LIMIT));
     onSnapshot(q, (snapshot) => {
@@ -586,9 +574,7 @@ function renderMain(postId) {
         groups[key].forEach((docSnap) => {
           postsEl.appendChild(renderPost(docSnap));
           globalPostIdx += 1;
-          if (globalPostIdx % ADS_EVERY_N_POSTS === 0) {
-            postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
-          }
+          if (globalPostIdx % ADS_EVERY_N_POSTS === 0) postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
         });
       });
     });
@@ -607,14 +593,12 @@ window.openLightbox = function(url) {
 };
 
 window.sharePost = async function(url) {
-  const shareData = { url: url };
+  const shareData = { url };
   if (navigator.share) {
     try { await navigator.share(shareData); } catch (err) {}
   } else if (navigator.clipboard) {
-    try {
-      await navigator.clipboard.writeText(url);
-      alert("Link disalin! Silakan tempel ke aplikasi yang diinginkan.");
-    } catch (err) { prompt("Salin link ini secara manual:", url); }
+    try { await navigator.clipboard.writeText(url); alert("Link disalin! Silakan tempel ke aplikasi yang diinginkan."); }
+    catch (err) { prompt("Salin link ini secara manual:", url); }
   } else {
     prompt("Salin link ini secara manual:", url);
   }
