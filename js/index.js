@@ -44,6 +44,8 @@ let totalPostsCount = null;
 let totalCountSeq = 0;
 let searchActive = false;
 const MAIN_FEED_LIMIT = 50;
+let currentSort = "terbaru";
+let mainFeedDocsCache = [];
 
 const ADS_EVERY_N_POSTS = 4;
 const ADS_ZONE_SQUARE = { key: "8eb886ab4511979ddc3b249d33e34725", width: 300, height: 250 };
@@ -153,6 +155,7 @@ async function loadLinkDomainSetting() {
   loadCustomChipBar();
   loadCategoryBar();
   setupSearch();
+  setupSortBar();
   const postId = await resolvePostId();
   renderMain(postId);
 })();
@@ -358,6 +361,44 @@ function setupSearch() {
   });
 }
 
+/* ================== SORT BAR ================== */
+function setupSortBar() {
+  const sortBarEl = document.getElementById("sortChipBar");
+  if (!sortBarEl || sortBarEl._wired) return;
+  sortBarEl._wired = true;
+  sortBarEl.querySelectorAll(".sort-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (searchActive) return;
+      sortBarEl.querySelectorAll(".sort-chip").forEach((t) => t.classList.remove("active"));
+      btn.classList.add("active");
+      currentSort = btn.dataset.sort;
+      renderSortedFeed();
+    });
+  });
+}
+
+function renderSortedFeed() {
+  if (mainFeedDocsCache.length === 0) return;
+  postsEl.innerHTML = "";
+  let docs = [...mainFeedDocsCache];
+
+  if (currentSort === "terlama") {
+    docs = docs.reverse();
+  } else if (currentSort === "terpopuler") {
+    // Logic disamakan persis dengan admin.js (sortAdminPosts): urut
+    // murni dari postViews terbanyak, bukan gabungan linkClicks+postViews.
+    docs = docs.sort((a, b) => (b.data().postViews || 0) - (a.data().postViews || 0));
+  }
+  // "terbaru" = urutan default dari Firestore (desc createdAt)
+
+  docs.forEach((docSnap, idx) => {
+    postsEl.appendChild(renderPost(docSnap));
+    if ((idx + 1) % ADS_EVERY_N_POSTS === 0 && idx !== docs.length - 1) {
+      postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
+    }
+  });
+}
+
 function renderSuggestions(qText) {
   const suggestBox = document.getElementById("searchSuggestions");
   const matchedTags = allTagsCache.filter((t) => t.toLowerCase().includes(qText));
@@ -538,44 +579,12 @@ function renderMain(postId) {
     });
 
   } else {
+    // Homepage: flat feed dengan sort bar
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(MAIN_FEED_LIMIT));
     onSnapshot(q, (snapshot) => {
       if (searchActive) return;
-      if (snapshot.empty) { postsEl.innerHTML = '<p class="empty">Belum ada konten.</p>'; return; }
-
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const sevenDaysAgo = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
-      const groups = { hariIni: [], mingguIni: [], lebihLama: [] };
-
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const created = data.createdAt?.toDate ? data.createdAt.toDate() : null;
-        if (created && created >= startOfToday) groups.hariIni.push(docSnap);
-        else if (created && created >= sevenDaysAgo) groups.mingguIni.push(docSnap);
-        else groups.lebihLama.push(docSnap);
-      });
-
-      postsEl.innerHTML = "";
-      const sections = [
-        { key: "hariIni", label: "Hari Ini" },
-        { key: "mingguIni", label: "Minggu Ini" },
-        { key: "lebihLama", label: "Lebih Lama" }
-      ];
-
-      let globalPostIdx = 0;
-      sections.forEach(({ key, label }) => {
-        if (groups[key].length === 0) return;
-        const title = document.createElement("div");
-        title.className = "section-title";
-        title.textContent = label;
-        postsEl.appendChild(title);
-        groups[key].forEach((docSnap) => {
-          postsEl.appendChild(renderPost(docSnap));
-          globalPostIdx += 1;
-          if (globalPostIdx % ADS_EVERY_N_POSTS === 0) postsEl.appendChild(createAdsSlot(ADS_ZONE_SQUARE, true));
-        });
-      });
+      mainFeedDocsCache = snapshot.docs;
+      renderSortedFeed();
     });
   }
 }
