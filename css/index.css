@@ -18,13 +18,24 @@ body {
 /* ══════════════════════════════════════
    HEADER / LOGO
 ══════════════════════════════════════ */
+/* Membungkus header (logo+search) dan sort-chip-bar jadi satu blok
+   sticky — cukup satu position:sticky di sini, semua isinya ikut
+   nempel ke atas layar sebagai satu kesatuan saat discroll. */
+.sticky-header-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  background: #fff8f0;
+  box-shadow: 0 2px 6px rgba(43,58,103,0.06);
+}
+
 header {
   background: #fff8f0;
   color: #1a1a2e;
   padding: 16px 15px 10px;
   text-align: left;
   position: relative;
-  border-bottom: 1px solid #e3e5ec;
+  border-bottom: none;
 }
 
 header h1 {
@@ -214,7 +225,7 @@ header h1 em {
   gap: 6px;
   overflow-x: auto;
   padding: 8px 15px;
-  border-bottom: 1px solid #e3e5ec;
+  border-bottom: none;
   background: #fff8f0;
   -webkit-overflow-scrolling: touch;
 }
@@ -258,7 +269,7 @@ header h1 em {
   gap: 8px;
   overflow-x: auto;
   padding: 14px 15px 12px 15px;
-  border-bottom: 1px solid #e3e5ec;
+  border-bottom: none;
   background: #fff8f0;
   -webkit-overflow-scrolling: touch;
 }
@@ -338,10 +349,6 @@ header h1 em {
   -webkit-overflow-scrolling: touch;
   border-bottom: none;
   background: #fff8f0;
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  box-shadow: 0 2px 6px rgba(43,58,103,0.06);
 }
 .sort-chip-bar::-webkit-scrollbar { display: none; }
 
