@@ -47,9 +47,9 @@
   <div class="loading-spinner" id="loadingSpinner"></div>
 </div>
 <div class="container" id="oldRotationWrap"></div>
-<div id="lightbox" class="lightbox" style="display:none;">
-  <button type="button" id="lightboxClose" class="lightbox-close" aria-label="Tutup">✕</button>
-  <img id="lightboxImg" src="" alt="">
+<div id="lightbox" class="lightbox" style="display:none;" onclick="this.style.display='none'">
+  <button type="button" id="lightboxClose" class="lightbox-close" aria-label="Tutup" onclick="document.getElementById('lightbox').style.display='none'">✕</button>
+  <img id="lightbox-img" src="" alt="">
 </div>
 <div class="sticky-ad-bar" id="stickyAdBar" style="display:none;">
   <span class="sticky-ad-close" id="stickyAdClose">✕</span>
