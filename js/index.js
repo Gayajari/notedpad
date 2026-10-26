@@ -458,8 +458,29 @@ function runFullSearch(qTextRaw) {
   }
 }
 
+/* Hitung "dilihat" (postViews) begitu postingan muncul ke user — di
+   beranda, tag, pencarian, atau halaman detail — bukan cuma pas buka
+   link share. Dedup pakai sessionStorage supaya ganti-ganti sort
+   (Terbaru/Terlama/Populer) yang render ulang semua post tidak
+   nge-spam increment berkali-kali untuk post yang sama. */
+function trackPostView(postId) {
+  try {
+    const seenKey = "viewedPosts";
+    const seen = new Set(JSON.parse(sessionStorage.getItem(seenKey) || "[]"));
+    if (seen.has(postId)) return;
+    seen.add(postId);
+    sessionStorage.setItem(seenKey, JSON.stringify([...seen]));
+  } catch (err) {
+    // sessionStorage tidak tersedia — tetap lanjut catat view-nya
+  }
+  updateDoc(doc(db, "posts", postId), { postViews: increment(1) }).catch((err) => {
+    console.error("Gagal mencatat view post:", err);
+  });
+}
+
 function renderPost(docSnap) {
   const data = docSnap.data();
+  trackPostView(docSnap.id);
   const date = data.createdAt?.toDate
     ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
     : "";
@@ -514,11 +535,7 @@ function renderMain(postId) {
     getDoc(doc(db, "posts", postId)).then((docSnap) => {
       if (!docSnap.exists()) { postsEl.innerHTML = '<p class="empty">Materi tidak ditemukan.</p>'; return; }
       postsEl.innerHTML = "";
-      postsEl.appendChild(renderPost(docSnap));
-
-      updateDoc(doc(db, "posts", postId), { postViews: increment(1) }).catch((err) => {
-        console.error("Gagal mencatat view post:", err);
-      });
+      postsEl.appendChild(renderPost(docSnap)); // trackPostView() sudah jalan di dalam renderPost()
 
       const otherWrap = document.createElement("div");
       otherWrap.id = "otherPosts";
