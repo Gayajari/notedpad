@@ -224,11 +224,12 @@ header h1 em {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 8px 15px;
+  padding: 0 15px;
   border-bottom: none;
   background: #fff8f0;
   -webkit-overflow-scrolling: touch;
 }
+.contact-bar:empty { padding: 0; }
 .contact-bar::-webkit-scrollbar { display: none; }
 
 /* index.js mengisi #contactBar dengan <a> polos tanpa class, jadi
@@ -268,11 +269,12 @@ header h1 em {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 14px 15px 0 15px;
+  padding: 0 15px;
   border-bottom: none;
   background: #fff8f0;
   -webkit-overflow-scrolling: touch;
 }
+.category-bar:empty { padding: 0; }
 .category-bar::-webkit-scrollbar { display: none; }
 
 .category-chip {
