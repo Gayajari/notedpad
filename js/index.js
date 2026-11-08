@@ -50,6 +50,10 @@ let mainFeedDocsCache = [];
 const ADS_EVERY_N_POSTS = 4;
 const ADS_ZONE_SQUARE = { key: "8eb886ab4511979ddc3b249d33e34725", width: 300, height: 250 };
 const ADS_ZONE_LEADERBOARD = { key: "c815dc8b1442b1b2e98cf2ac0376024c", width: 320, height: 50 };
+// TODO: ganti "GANTI_DENGAN_KEY_728x90" dengan key zone 728x90 yang
+// dibuat khusus di dashboard jaringan iklan (tiap ukuran = zone/key
+// terpisah, tidak bisa pakai key 320x50 di atas untuk ukuran ini).
+const ADS_ZONE_LEADERBOARD_DESKTOP = { key: "GANTI_DENGAN_KEY_728x90", width: 728, height: 90 };
 
 function buildAdsIframe(zone) {
   const iframe = document.createElement("iframe");
@@ -82,6 +86,89 @@ function createAdsSlot(zone, showLabel) {
 }
 
 document.getElementById("headerAdsSlot").appendChild(buildAdsIframe(ADS_ZONE_LEADERBOARD));
+
+/* ================== STICKY BANNER BAWAH (responsive) ==================
+   Mobile (Android/iOS, lebar layar < 768px) → 320x50
+   Desktop (lebar layar >= 768px)            → 728x90
+   Ganti zone cuma kalau breakpoint-nya kebeneran kelewatan (bukan tiap
+   kali resize event nembak) supaya iframe iklan nggak di-reload
+   berulang-ulang dan boros bandwidth — misalnya toolbar browser di HP
+   yang muncul/hilang saat scroll itu juga memicu resize tapi nggak
+   mengubah kategori mobile/desktop, jadi harus di-skip. */
+const STICKY_AD_BREAKPOINT = 768;
+let stickyAdCurrentMode = null; // "mobile" | "desktop" | null
+
+function getStickyAdZone() {
+  return window.innerWidth >= STICKY_AD_BREAKPOINT ? ADS_ZONE_LEADERBOARD_DESKTOP : ADS_ZONE_LEADERBOARD;
+}
+
+function setupStickyBottomAd() {
+  const bar = document.getElementById("stickyAdBar");
+  const slot = document.getElementById("stickyAdSlot");
+  const closeBtn = document.getElementById("stickyAdClose");
+  if (!bar || !slot) return;
+
+  // Kalau user sudah nutup di sesi ini, jangan munculin lagi (hemat
+  // bandwidth + nggak ganggu terus-terusan).
+  try {
+    if (sessionStorage.getItem("stickyAdClosed") === "1") return;
+  } catch (err) {}
+
+  function renderZone() {
+    const mode = window.innerWidth >= STICKY_AD_BREAKPOINT ? "desktop" : "mobile";
+    if (mode === stickyAdCurrentMode) return; // ukuran kategori sama, skip reload
+    stickyAdCurrentMode = mode;
+    slot.innerHTML = "";
+    slot.appendChild(buildAdsIframe(getStickyAdZone()));
+    bar.style.display = "flex";
+    document.body.classList.add("has-sticky-ad");
+  }
+
+  renderZone();
+
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(renderZone, 250); // debounce
+  });
+
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      bar.style.display = "none";
+      document.body.classList.remove("has-sticky-ad");
+      try { sessionStorage.setItem("stickyAdClosed", "1"); } catch (err) {}
+    });
+  }
+}
+
+/* ================== SOCIAL BAR (lazy-load, sekali per sesi) ==================
+   Script social bar dari jaringan iklan dimuat LANGSUNG ke halaman (bukan
+   lewat iframe sandbox) karena memang begitu cara kerja format ini — dia
+   butuh akses penuh ke halaman buat nampilin overlay-nya. Yang bisa kita
+   kontrol dari sini cuma KAPAN dan SEBERAPA SERING dia dimuat:
+   - Ditunda sampai halaman selesai render + jeda singkat, supaya tidak
+     ikut menghambat loading konten utama & foto.
+   - Cuma dimuat SEKALI per sesi tab (sessionStorage), bukan tiap kali
+     elemen ke-render ulang.
+   Soal tampilannya yang "nutup selayar penuh" — itu diatur dari
+   dashboard jaringan iklannya sendiri (pengaturan format/frequency cap),
+   bukan dari kode ini; kode ini cuma bisa mengatur jadwal pemuatannya. */
+function loadSocialBarAd() {
+  try {
+    if (sessionStorage.getItem("socialBarLoaded") === "1") return;
+    sessionStorage.setItem("socialBarLoaded", "1");
+  } catch (err) {}
+  const s = document.createElement("script");
+  s.dataset.cfasync = "false";
+  s.src = "https://biomanos.org/14/840e169d1e3f86906bb1490d05d95d42";
+  document.body.appendChild(s);
+}
+
+function deferSocialBarAd() {
+  const start = () => setTimeout(loadSocialBarAd, 2500);
+  if (document.readyState === "complete") start();
+  else window.addEventListener("load", start, { once: true });
+}
 
 /* ================== DOMAIN MAPPING PER-GRUP (settings/linkDomain) ==================
    Struktur data di Firestore (settings/linkDomain):
@@ -156,6 +243,8 @@ async function loadLinkDomainSetting() {
   loadCategoryBar();
   setupSearch();
   setupSortBar();
+  setupStickyBottomAd();
+  deferSocialBarAd();
   const postId = await resolvePostId();
   renderMain(postId);
 })();
