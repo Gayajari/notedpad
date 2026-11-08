@@ -619,8 +619,11 @@ header h1 em {
   max-height: 100px;
   overflow: hidden;
 }
-body { padding-bottom: 76px; }
-body.ad-closed { padding-bottom: 0; }
+/* Padding bawah body cuma ditambah SAAT sticky ad bar aktif ditampilkan
+   (class ditambah/dihapus oleh JS) — biar user yang sudah nutup iklan
+   atau yang belum sempat iklannya kemuat nggak kebagian ruang kosong
+   nganggur di bawah layar. */
+body.has-sticky-ad { padding-bottom: 76px; }
 
 .sticky-ad-close {
   position: absolute;
